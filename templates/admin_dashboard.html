@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard de Administración</title>
+</head>
+<body>
+    <h1>Dashboard Admin ({{ current_user.get_role_name() }})</h1>
+    <p>Bienvenido, {{ current_user.nombre }}. Departamento asignado: {{ current_user.departamento_id }}</p>
+    <h2>Tareas Administrativas:</h2>
+    <ul>
+        <li><a href="#">Ver Analítica</a></li>
+        <li><a href="#">Manejar Reclamos de {{ current_user.departamento_id }}</a></li>
+        <li><a href="#">Generar Reporte HTML/PDF</a></li>
+    </ul>
+    <hr>
+    <p><a href="{{ url_for('logout') }}">Cerrar Sesión</a></p>
+</body>
+</html>

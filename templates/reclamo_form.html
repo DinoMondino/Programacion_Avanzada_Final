@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Crear Nuevo Reclamo{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Formulario de Nuevo Reclamo</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('crear_reclamo') }}" enctype="multipart/form-data">
+                        
+                        <div class="mb-3">
+                            <label for="contenido" class="form-label">Descripción Detallada del Problema:</label>
+                            <textarea class="form-control" id="contenido" name="contenido" rows="5" required
+                                placeholder="Ej: No funciona el aire acondicionado en el aula 101."></textarea>
+                            <div class="form-text">Sea específico para una mejor clasificación.</div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success mt-3">Enviar Reclamo</button>
+                            <a href="{{ url_for('menu_final') }}" class="btn btn-outline-secondary">Cancelar y Volver</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

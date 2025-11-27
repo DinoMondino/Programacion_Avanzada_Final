@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registro de Usuario Final</title>
+</head>
+<body>
+    <h1>Registro de Usuario Final</h1>
+    <form method="POST" action="/register">
+        <label for="nombre">Nombre:</label><br>
+        <input type="text" id="nombre" name="nombre" required><br><br>
+
+        <label for="apellido">Apellido:</label><br>
+        <input type="text" id="apellido" name="apellido" required><br><br>
+        
+        <label for="email">Email:</label><br>
+        <input type="email" id="email" name="email" required><br><br>
+
+        <label for="usuario">Nombre de Usuario:</label><br>
+        <input type="text" id="usuario" name="usuario" required><br><br>
+
+        <label for="contrasenia">Contraseña:</label><br>
+        <input type="password" id="contrasenia" name="contrasenia" required><br><br>
+        
+        <label for="claustro">Claustro:</label><br>
+        <select id="claustro" name="claustro">
+            <option value="ESTUDIANTE">Estudiante</option>
+            <option value="DOCENTE">Docente</option>
+            <option value="PAYS">PAyS</option>
+        </select><br><br>
+
+        <button type="submit">Registrarse</button>
+    </form>
+    <p><a href="/">Volver al Login</a></p>
+</body>
+</html>
