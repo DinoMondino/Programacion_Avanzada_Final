@@ -4,8 +4,6 @@ import io
 import datetime
 import sys
 
-# Importar las clases de tus módulos
-# Asegúrate de que estos archivos (usuarios.py, reclamos.py, etc.) estén en el mismo directorio.
 from modules.usuarios import UsuarioFinal, JefeDepartamento, SecretarioTecnico, Claustro, RolAdmin, UsuarioAdmin, EstadoReclamo
 from modules.reclamos import Clasificador, Reclamo
 from modules.gestor import Gestor_Reclamos
@@ -40,22 +38,29 @@ def initialize_mock_data():
     # 3.1. Usuarios Administradores (Alta a nivel de sistema - RF 53)
     
     # Jefe de Infraestructura
+    # CORRECCIÓN: Se añade el Claustro.PAYS (Personal de Apoyo y Servicios) para Administradores
     jd_infra = JefeDepartamento("J001", "jefe.infra@uner.ar", "jinfra", "1234", "Juan", "Perez", 
+                                Claustro.PAYS, # <--- Se pasa el claustro
                                 "D_INFRAESTRUCTURA", gestor_reclamos, analitica)
     _DB_USERS[jd_infra.usuario] = jd_infra
     
     # Jefe de Informática
+    # CORRECCIÓN: Se añade el Claustro.PAYS
     jd_info = JefeDepartamento("J002", "jefe.info@uner.ar", "jinfo", "1234", "Maria", "Gomez", 
+                                Claustro.PAYS, # <--- Se pasa el claustro
                                 "D_INFORMATICA", gestor_reclamos, analitica)
     _DB_USERS[jd_info.usuario] = jd_info
 
     # Secretaria Técnica
+    # CORRECCIÓN: Se añade el Claustro.PAYS
     st = SecretarioTecnico("S001", "secre.tec@uner.ar", "stec", "1234", "Ana", "Lopez", 
+                           Claustro.PAYS, # <--- Se pasa el claustro
                            gestor_reclamos, analitica)
     _DB_USERS[st.usuario] = st
     
     # 3.2. Usuarios Finales
     
+    # Los argumentos del UsuarioFinal son correctos si el constructor está arreglado en usuarios.py
     uf_estudiante = UsuarioFinal("UF001", "estudiante@uner.ar", "user_est", "1234", "Pedro", "García", 
                                 Claustro.ESTUDIANTE, gestor_reclamos)
     _DB_USERS[uf_estudiante.usuario] = uf_estudiante
@@ -93,7 +98,13 @@ def initialize_mock_data():
 
 
 # Ejecutar la inicialización
-initialize_mock_data()
+try:
+    initialize_mock_data()
+except TypeError as e:
+    # Captura el error en la consola si persiste
+    print(f"\n[ERROR CRÍTICO EN MOCK DATA] Falló la inicialización de usuarios: {e}", file=sys.stderr)
+    print("Por favor, revisa el constructor de las clases en 'usuarios.py' y asegúrate de que llamen a super().__init__(...) con todos los argumentos requeridos.", file=sys.stderr)
+    sys.exit(1)
 
 
 # --- 4. Funciones de Ayuda (Autenticación) ---
@@ -152,10 +163,7 @@ def login():
     
     user = _DB_USERS.get(username)
     
-    # El método login de Usuario es un método estático y espera el hash para comparar, 
-    # pero si la clase UsuarioFinal tiene un método login, se usa ese.
-    # En este caso, el método login de Usuario (clase base) está redefiniendo cómo buscar 
-    # y cómo chequear la contraseña usando el hash.
+    # El método login de Usuario (clase base) debería manejar la comparación de contraseña
     if user and user.login(username, password, _DB_USERS):
         session['user_id'] = user.id
         flash(f"Bienvenido/a, {user.nombre}.", "success")
@@ -385,6 +393,7 @@ def ver_mis_reclamos():
 def admin_dashboard():
     """Muestra el dashboard para Jefes de Departamento y Secretario Técnico (RF 46-48)"""
     user = get_current_user()
+    # Este método DEBE existir en las clases de Admin para retornar su depto o "ALL"
     depto_id = user.get_departamento_id()
     
     # Determinar qué reclamos mostrar
@@ -396,7 +405,8 @@ def admin_dashboard():
     else:
         # Jefe ve solo los de su departamento
         reclamos_del_depto = gestor_reclamos.get_reclamos_por_departamento(depto_id)
-        analitica_data = user.ver_analitica(depto_id)
+        # Este método DEBE existir en JefeDepartamento (o su Mixin)
+        analitica_data = user.ver_analitica(depto_id) 
 
     # Mapeo de reclamos para la tabla del dashboard
     reclamos_map = [
@@ -432,7 +442,8 @@ def actualizar_estado_reclamo():
         flash("Estado inválido.", "danger")
         return redirect(url_for('admin_dashboard'))
     
-    if user.actualizar_estado_reclamo(reclamo_id, nuevo_estado):
+    # Este método DEBE existir en las clases Admin (o su Mixin)
+    if user.actualizar_estado_reclamo(reclamo_id, nuevo_estado): 
         flash(f"Estado del reclamo {reclamo_id} actualizado a {nuevo_estado.value}.", "success")
     else:
         flash(f"Error: No se pudo actualizar el estado del reclamo {reclamo_id} o no tienes permiso.", "danger")
@@ -451,7 +462,8 @@ def derivar_reclamo():
         flash("Error: Departamento destino inválido.", "danger")
         return redirect(url_for('admin_dashboard'))
         
-    if user.derivar_reclamo(reclamo_id, nuevo_depto_id):
+    # Este método DEBE existir en SecretarioTecnico (o su Mixin)
+    if user.derivar_reclamo(reclamo_id, nuevo_depto_id): 
         flash(f"Reclamo {reclamo_id} derivado exitosamente al departamento {_DB_DEPARTMENTS[nuevo_depto_id]}.", "success")
     else:
         flash(f"Error: No se pudo derivar el reclamo {reclamo_id}. Verifica el ID.", "danger")
@@ -477,8 +489,9 @@ def generar_reporte():
 
     # Validación de permiso implícita: si el Jefe intenta reportar otro, 
     # se le fuerza a usar su depto_id.
-
-    reporte_content = user.generar_reporte(depto_id_reporte, formato)
+    
+    # Este método DEBE existir en las clases Admin (o su Mixin)
+    reporte_content = user.generar_reporte(depto_id_reporte, formato) 
     
     if "Error" in reporte_content:
         flash(f"Error al generar el reporte: {reporte_content}", "danger")
