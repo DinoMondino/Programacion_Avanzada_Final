@@ -1,64 +1,47 @@
 {% extends "base.html" %}
-{% block title %}Menú de Usuario Final{% endblock %}
+
+{% block title %}Menú de Usuario{% endblock %}
+
+{% block nav_links %}
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('logout') }}">Salir 🚪</a>
+    </li>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+    <h1 class="text-center mb-5" style="color: #004d40;">Bienvenido, {{ current_user.nombre }} ({{ current_user.claustro.value }})</h1>
 
-    <h2 class="mb-4">Bienvenido, {{ current_user.nombre }} ({{ current_user.claustro.value }})</h2>
-    
-    <div class="d-grid gap-3 mb-5">
-        <a href="{{ url_for('crear_reclamo_form') }}" class="btn btn-primary btn-lg">
-            Crear Nuevo Reclamo 📝 (RF 33)
-        </a>
-        <a href="{{ url_for('listar_reclamos_claustro') }}" class="btn btn-secondary btn-lg">
-            Listar Reclamos de mi Claustro 📋 (RF 45)
-        </a>
-        <a href="#mis-reclamos-section" class="btn btn-info btn-lg">
-            Mis Reclamos (Creados/Adheridos) 👇 (RF 44)
-        </a>
-    </div>
-    
-    <hr id="mis-reclamos-section">
-
-    <h3 class="mb-4">Mis Reclamos (Creados y Adheridos)</h3>
-
-    {% if reclamos|length == 0 %}
-        <div class="alert alert-warning" role="alert">
-            Aún no has creado ni te has adherido a ningún reclamo.
+    <div class="row justify-content-center">
+        
+        <div class="col-md-4 mb-4">
+            <div class="card text-center h-100 shadow-lg border-primary">
+                <div class="card-body">
+                    <h5 class="card-title">📝 Crear Reclamo</h5>
+                    <p class="card-text">Detalla tu problema o sugerencia para que sea atendido.</p>
+                    <a href="{{ url_for('crear_reclamo') }}" class="btn btn-primary" style="background-color: #004d40; border-color: #004d40;">Abrir Formulario</a>
+                </div>
+            </div>
         </div>
-    {% else %}
-        <div class="list-group">
-            {% for reclamo in reclamos %}
-                <div class="list-group-item list-group-item-action">
-                    <div class="d-flex w-100 justify-content-between">
-                        <h5 class="mb-1">[{{ reclamo.id }}] {{ reclamo.contenido[:60] }}...</h5>
-                        <span class="badge 
-                            {% if reclamo.estado.value == 'pendiente' %} bg-warning text-dark
-                            {% elif reclamo.estado.value == 'en_proceso' %} bg-info
-                            {% elif reclamo.estado.value == 'resuelto' %} bg-success
-                            {% else %} bg-secondary
-                            {% endif %}">
-                            {{ reclamo.estado.value.capitalize() }}
-                        </span>
-                    </div>
-                    <p class="mb-1">Departamento: **{{ reclamo.departamento_id }}**</p>
-                    <small>Adheridos: {{ reclamo.cant_adherentes if reclamo.cant_adherentes is defined else 1 }}</small>
-                    </div>
-            {% endfor %}
+
+        <div class="col-md-4 mb-4">
+            <div class="card text-center h-100 shadow-lg border-info">
+                <div class="card-body">
+                    <h5 class="card-title">📋 Listar Reclamos</h5>
+                    <p class="card-text">Ver todos los reclamos **pendientes** y adherirte si lo deseas.</p>
+                    <a href="{{ url_for('listar_reclamos') }}" class="btn btn-info text-white">Ver Listado</a>
+                </div>
+            </div>
         </div>
-    {% endif %}
 
-    <div class="text-center mt-5">
-        <a href="{{ url_for('logout') }}" class="btn btn-danger">Cerrar Sesión</a>
+        <div class="col-md-4 mb-4">
+            <div class="card text-center h-100 shadow-lg border-success">
+                <div class="card-body">
+                    <h5 class="card-title">👀 Mis Reclamos</h5>
+                    <p class="card-text">Consulta el estado y seguimiento de tus reclamos creados o adheridos.</p>
+                    <a href="{{ url_for('ver_mis_reclamos') }}" class="btn btn-success">Ver Seguimiento</a>
+                </div>
+            </div>
+        </div>
+
     </div>
-
-</div>
 {% endblock %}

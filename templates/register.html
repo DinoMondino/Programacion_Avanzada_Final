@@ -1,36 +1,68 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Registro de Usuario Final</title>
-</head>
-<body>
-    <h1>Registro de Usuario Final</h1>
-    <form method="POST" action="/register">
-        <label for="nombre">Nombre:</label><br>
-        <input type="text" id="nombre" name="nombre" required><br><br>
+{% extends "base.html" %}
 
-        <label for="apellido">Apellido:</label><br>
-        <input type="text" id="apellido" name="apellido" required><br><br>
-        
-        <label for="email">Email:</label><br>
-        <input type="email" id="email" name="email" required><br><br>
+{% block title %}Registro de Usuario Final{% endblock %}
 
-        <label for="usuario">Nombre de Usuario:</label><br>
-        <input type="text" id="usuario" name="usuario" required><br><br>
+{% block content %}
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <h1 class="text-center mb-4" style="color: #004d40;">Registro de Usuario Final</h1>
+            <p class="text-center">Completa tus datos para crear una cuenta y poder ingresar reclamos.</p>
+            
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form action="{{ url_for('register_post') }}" method="post">
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="nombre" class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="nombre" name="nombre" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="apellido" class="form-label">Apellido</label>
+                                <input type="text" class="form-control" id="apellido" name="apellido" required>
+                            </div>
+                        </div>
 
-        <label for="contrasenia">Contraseña:</label><br>
-        <input type="password" id="contrasenia" name="contrasenia" required><br><br>
-        
-        <label for="claustro">Claustro:</label><br>
-        <select id="claustro" name="claustro">
-            <option value="ESTUDIANTE">Estudiante</option>
-            <option value="DOCENTE">Docente</option>
-            <option value="PAYS">PAyS</option>
-        </select><br><br>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" name="email" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="usuario" class="form-label">Nombre de Usuario</label>
+                                <input type="text" class="form-control" id="usuario" name="usuario" required>
+                            </div>
+                        </div>
 
-        <button type="submit">Registrarse</button>
-    </form>
-    <p><a href="/">Volver al Login</a></p>
-</body>
-</html>
+                        <div class="mb-3">
+                            <label for="claustro" class="form-label">Claustro</label>
+                            <select class="form-select" id="claustro" name="claustro" required>
+                                <option value="" disabled selected>Selecciona tu claustro</option>
+                                <option value="ESTUDIANTE">Estudiante</option>
+                                <option value="DOCENTE">Docente</option>
+                                <option value="PAYS">PAyS</option>
+                            </select>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="contrasenia" class="form-label">Contraseña</label>
+                                <input type="password" class="form-control" id="contrasenia" name="contrasenia" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="contrasenia_repetida" class="form-label">Repetir Contraseña</label>
+                                <input type="password" class="form-control" id="contrasenia_repetida" name="contrasenia_repetida" required>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100 mt-3">Registrarse</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="text-center mt-3">
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Volver al Login</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}

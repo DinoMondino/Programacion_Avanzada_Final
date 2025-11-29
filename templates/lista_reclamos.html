@@ -1,41 +1,93 @@
 {% extends "base.html" %}
-{% block title %}Listado de Reclamos{% endblock %}
+
+{% block title %}{{ titulo_listado }}{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>{{ titulo }}</h2>
-        <a href="{{ url_for('menu_final') }}" class="btn btn-secondary">Volver al Menú</a>
-    </div>
-    
-    {% if reclamos|length == 0 %}
-        <div class="alert alert-info" role="alert">
-            No hay reclamos registrados para tu claustro. ¡Sé el primero en crear uno!
-        </div>
-    {% else %}
-        <div class="list-group">
-            {% for reclamo in reclamos %}
-            <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-1 text-primary">[{{ reclamo.id }}] {{ reclamo.contenido[:80] }}...</h5>
-                    <small class="text-muted">Departamento: {{ reclamo.departamento_id }}</small><br>
-                    <small>Creado: {{ reclamo.fecha_hora.strftime('%d/%m/%Y') }} | 
-                           Adheridos: {{ reclamo.cant_adherentes if reclamo.cant_adherentes is defined else 1 }}</small>
+    <h1 class="mb-4" style="color: #004d40;">{{ titulo_listado }}</h1>
+
+    {% if es_listado_global %}
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <form action="{{ url_for('listar_reclamos') }}" method="get" class="row align-items-center">
+                <div class="col-md-4">
+                    <label for="depto_id" class="form-label mb-0">Filtrar por Departamento:</label>
                 </div>
-                <div class="text-end">
-                    <span class="badge 
-                        {% if reclamo.estado.value == 'pendiente' %} bg-warning text-dark
-                        {% elif reclamo.estado.value == 'en_proceso' %} bg-info
-                        {% elif reclamo.estado.value == 'resuelto' %} bg-success
-                        {% else %} bg-secondary
-                        {% endif %}">
-                        {{ reclamo.estado.value.capitalize() }}
-                    </span>
-                    </div>
-            </div>
-            {% endfor %}
+                <div class="col-md-5">
+                    <select class="form-select" id="depto_id" name="depto_id">
+                        <option value="">Mostrar Todos</option>
+                        {% for depto_id, depto_nombre in departamentos.items() %}
+                            <option value="{{ depto_id }}" {% if depto_id == filtro_actual %}selected{% endif %}>{{ depto_nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-secondary w-100">Filtrar</button>
+                </div>
+            </form>
         </div>
+    </div>
     {% endif %}
 
-</div>
+    {% if reclamos|length > 0 %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover shadow-sm">
+                <thead class="bg-dark text-white">
+                    <tr>
+                        <th>ID</th>
+                        <th>Estado</th>
+                        <th>Fecha/Hora</th>
+                        <th>Departamento</th>
+                        <th>Adherentes</th>
+                        <th>Contenido</th>
+                        {% if es_listado_global %}
+                            <th>Acción</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reclamos %}
+                    <tr>
+                        <td>{{ r.ID }}</td>
+                        <td>
+                            <span class="badge 
+                            {% if r.Estado == 'pendiente' %} bg-warning text-dark
+                            {% elif r.Estado == 'en_proceso' %} bg-info
+                            {% elif r.Estado == 'resuelto' %} bg-success
+                            {% elif r.Estado == 'inválido' %} bg-danger
+                            {% endif %}">
+                                {{ r.Estado|upper }}
+                            </span>
+                        </td>
+                        <td>{{ r.Fecha }}</td>
+                        <td>{{ r.Departamento }}</td>
+                        <td>{{ r.Adherentes }}</td>
+                        <td>{{ r.Contenido }}</td>
+                        
+                        {% if es_listado_global %}
+                            <td>
+                                {% if r.Puede_Adherirse %}
+                                    <form action="{{ url_for('adherirse_reclamo') }}" method="post" style="display: inline;">
+                                        <input type="hidden" name="reclamo_id" value="{{ r.ID }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Adherirse</button>
+                                    </form>
+                                {% else %}
+                                    <button class="btn btn-sm btn-light" disabled>No Adherible</button>
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info text-center">
+            No se encontraron reclamos en este listado.
+        </div>
+    {% endif %}
+    
+    <div class="text-center mt-4">
+        <a href="{{ url_for('user_menu') }}" class="btn btn-secondary">Volver al Menú</a>
+    </div>
+
 {% endblock %}
