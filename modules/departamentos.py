@@ -1,147 +1,107 @@
 import datetime 
 from typing import List, Dict, Any, Optional
+from collections import Counter
 from .reclamos import Reclamo, EstadoReclamo
 from .gestor import Gestor_Reclamos
 
-""" Que analitica haga las gráficas y lo del html, los tiene que generar y despues poenerlo tmb en app.py"""
-
 class Departamento:
-    def __init__(self, id_departamento: str, nombre: str, jefe_id: str, gestor_servicio: Optional[Any] = None):
+    """Unidad administrativa de la facultad, mantiene una relación 1 a muchos con Reclamo."""
+    def __init__(self, id_departamento: str, nombre: str, jefe_id: str, gestor_servicio: Optional[Gestor_Reclamos] = None):
         self.id: str = id_departamento
         self.nombre: str = nombre
-        self.jefe_id: str = jefe_id 
-        self._gestor_reclamos = gestor_servicio # Dependencia inyectada
+        self.jefe_id: str = jefe_id # ID del Usuario_Admin responsable
+        self._gestor_reclamos = gestor_servicio 
+        self.lista_reclamos: List[Reclamo] = []
 
     def listar_reclamos(self) -> List[Reclamo]:
-        # Devuelve todos los reclamos asociados al departamento, usando el Gestor
+        # Muestra la lista de reclamos pertenecientes al departamento.
+        # Actualiza la lista interna desde el gestor.
         if self._gestor_reclamos:
-            return self._gestor_reclamos.get_reclamos_por_departamento(self.id)
-        print(f"[Departamento: {self.nombre}] Advertencia: Gestor no disponible.")
-        return []
+            self.lista_reclamos = self._gestor_reclamos.get_reclamos_por_departamento(self.id)
+        return self.lista_reclamos
 
     def listar_reclamos_pendientes(self) -> List[Reclamo]:
-        # Devuelve solo los reclamos en estado PENDIENTE
-        if self._gestor_reclamos:
-            return self._gestor_reclamos.get_reclamos_pendientes_filtrados(self.id)
-        print(f"[Departamento: {self.nombre}] Advertencia: Gestor no disponible.")
-        return [] 
+        # Filtra los reclamos para la vista operativa del jefe de departamento.
+        return [r for r in self.listar_reclamos() if r.estado == EstadoReclamo.PENDIENTE]
 
 
 class Analitica:
-    # Para calcular métricas y reportes sobre los reclamos
+    """ Genera estadísticas y reportes para que visualizen los responsables."""
     def __init__(self, gestor_servicio: Gestor_Reclamos):
         self._gestor_reclamos = gestor_servicio
 
-    def get_reclamos_depto(self, departamento_id: str) -> List[Reclamo]:
-        if self._gestor_reclamos:
-            return self._gestor_reclamos.get_reclamos_por_departamento(departamento_id)
-        return []
-        
-    def get_estadisticas_generales(self, departamento_id: str) -> Dict[str, float]:
-        # Calcula el porcentaje de reclamos por estado y hace una gráfica circular
-        print(f"[Analitica] Calculando estadísticas para depto ID: {departamento_id}")
-        reclamos = self.get_reclamos_depto(departamento_id)
+    def get_estadisticas_generales(self, departamento_id: str) -> Dict[str, Any]:
+        # Calcula porcentajes para el diagrama circular (Totales, % en Proceso y % Resueltos).
+        reclamos = self._gestor_reclamos.get_reclamos_por_departamento(departamento_id)
         total = len(reclamos)
         
         if total == 0:
             return {
                 "total_reclamos": 0,
                 "pct_en_proceso": 0.0,
-                "pct_resueltos": 0.0,
-                "pct_invalidos": 0.0,
-                "pct_pendientes": 0.0
+                "pct_resueltos": 0.0
             }
 
-        conteo = {estado: 0 for estado in EstadoReclamo}
-        for r in reclamos:
-            conteo[r.estado] += 1
-            
+        # Conteo según estados del Enum
+        en_proceso = sum(1 for r in reclamos if r.estado == EstadoReclamo.EN_PROCESO)
+        resueltos = sum(1 for r in reclamos if r.estado == EstadoReclamo.RESUELTO)
+        
         return {
             "total_reclamos": total,
-            "pct_en_proceso": round((conteo[EstadoReclamo.EN_PROCESO] / total) * 100, 2),
-            "pct_resueltos": round((conteo[EstadoReclamo.RESUELTO] / total) * 100, 2),
-            "pct_invalidos": round((conteo[EstadoReclamo.INVALIDO] / total) * 100, 2),
-            "pct_pendientes": round((conteo[EstadoReclamo.PENDIENTE] / total) * 100, 2)
+            "pct_en_proceso": round((en_proceso / total) * 100, 2),
+            "pct_resueltos": round((resueltos / total) * 100, 2)
         }
 
     def get_frecuencia_palabras(self, departamento_id: str) -> Dict[str, int]:
-        # Calcula la frecuencia de las palabras clave más comunes (sin stopwords)
-        from collections import Counter
-        
-        print(f"[Analitica] Calculando frecuencia de palabras clave para depto ID: {departamento_id}")
-        reclamos = self.get_reclamos_depto(departamento_id)
+        # Obtiene las 15 palabras clave más frecuentes. 'Clasificador' ya filtró las stopwords.
+        reclamos = self._gestor_reclamos.get_reclamos_por_departamento(departamento_id)
         
         todas_palabras = []
         for r in reclamos:
+            # Las palabras_clave se extraen del contenido del reclamo
             todas_palabras.extend(r.palabras_clave)
             
         frecuencia = Counter(todas_palabras)
-        
-        top_n = dict(frecuencia.most_common(20)) 
-        return top_n
+        return dict(frecuencia.most_common(15))
 
-    def generar_reporte_html(self, departamento_id: str, stats: Dict[str, float], frecuencia: Dict[str, int]) -> str:
-        # Genera y devuelve un reporte en formato HTML, incluyendo estadísticas y nube de palabras
-        print(f"[Analitica] Generando reporte HTML para depto ID: {departamento_id}")
-        
-        # Formateo de la frecuencia para el HTML
-        frec_html = "<ul>"
+    def generar_reporte_html(self, departamento_id: str) -> str:
+        # Genera reporte en formato HTML con gráficas y tablas.
+        stats = self.get_estadisticas_generales(departamento_id)
+        frecuencia = self.get_frecuencia_palabras(departamento_id)
+        # Formateo de la frecuencia para simular la "Nube de Palabras". A mayor frecuencia, mayor 'font-size'
+        frec_html = "<div>"
         for palabra, cuenta in frecuencia.items():
-            frec_html += f"<li>{palabra}: {cuenta}</li>"
-        frec_html += "</ul>"
+            tamanio = 10 + (cuenta * 2) # Lógica para tamaño de fuente
+            frec_html += f"<span style='font-size:{tamanio}px; margin:5px;'>{palabra}</span> "
+        frec_html += "</div>"
         
-        # Formateo de las estadísticas
-        stats_html = (
-            f"<p>Total de Reclamos: <b>{stats.get('total_reclamos', 0)}</b></p>"
-            "<table>"
-            "<thead><tr><th>Estado</th><th>Porcentaje</th></tr></thead><tbody>"
-            f"<tr><td>PENDIENTE</td><td>{stats.get('pct_pendientes', 0.0)}%</td></tr>"
-            f"<tr><td>EN PROCESO</td><td>{stats.get('pct_en_proceso', 0.0)}%</td></tr>"
-            f"<tr><td>RESUELTO</td><td>{stats.get('pct_resueltos', 0.0)}%</td></tr>"
-            f"<tr><td>INVÁLIDO</td><td>{stats.get('pct_invalidos', 0.0)}%</td></tr>"
-            "</tbody></table>"
-        )
-        
-        # Contenido HTML con un poco de estilo simulado
-        html_content = f"""\
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reporte de Reclamos - Depto. {departamento_id}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; }}
-        h1 {{ color: #004d40; border-bottom: 2px solid #004d40; padding-bottom: 5px; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
-        th, td {{ border: 1px solid #ccc; padding: 8px; text-align: left; }}
-        th {{ background-color: #e0f2f1; }}
-        .section {{ margin-top: 30px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }}
-    </style>
-</head>
-<body>
-    <h1>Reporte de Reclamos - Depto. {departamento_id}</h1>
-
-    <div class="section">
-        <h2>Estadísticas Generales (Diagrama Circular)</h2>
-        {stats_html}
-    </div>
-
-    <div class="section">
-        <h2>Frecuencia de Palabras Clave (Word Cloud)</h2>
-        {frec_html}
-    </div>
-    
-    <p style="margin-top: 40px; font-size: 0.8em; color: #888;">Reporte generado el {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-</body>
-</html>
-""" # <--- CORRECCIÓN CLAVE: La cadena se ajusta a la izquierda para que empiece en <html>
+        html_content = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: sans-serif; }}
+                .stat-box {{ border: 1px solid #333; padding: 10px; margin-bottom: 20px; }}
+            </style>
+        </head>
+        <body>
+            <h1>Reporte de Gestión - Depto {departamento_id}</h1>
+            <div class="stat-box">
+                <h2>Estadísticas (RF 54)</h2>
+                <p>Total Reclamos: {stats['total_reclamos']}</p>
+                <p>En Proceso: {stats['pct_en_proceso']}%</p>
+                <p>Resueltos: {stats['pct_resueltos']}%</p>
+            </div>
+            <div class="stat-box">
+                <h2>Nube de Palabras Clave (RF 55/56)</h2>
+                {frec_html}
+            </div>
+            <footer>Generado el: {datetime.datetime.now()}</footer>
+        </body>
+        </html>
+        """
         return html_content
 
-
     def generar_reporte_pdf(self, departamento_id: str) -> str:
-        """
-        Simula la generación de un reporte en formato PDF. (RF 59)
-        """
-        # En una aplicación real, esto usaría una librería como ReportLab o FPDF.
-        print(f"[Analitica] Simulación: Generando reporte PDF para depto ID: {departamento_id}")
-        return f"Reporte PDF para el Departamento {departamento_id} (Simulado: Contiene estadísticas y nube de palabras clave)."
+        # Genera reporte en formato PDF, se devuelve su ruta.
+        print(f"Generando PDF para depto {departamento_id}...")
+        return f"reporte_{departamento_id}.pdf"

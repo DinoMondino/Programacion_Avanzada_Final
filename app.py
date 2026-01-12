@@ -3,8 +3,8 @@ from functools import wraps
 import io
 import datetime
 import sys
-
-from modules.usuarios import UsuarioFinal, JefeDepartamento, SecretarioTecnico, Claustro, RolAdmin, UsuarioAdmin, EstadoReclamo
+# Se importa la clase 'Usuario' para el hasheo de contraseñas
+from modules.usuarios import UsuarioFinal, JefeDepartamento, SecretarioTecnico, Claustro, RolAdmin, UsuarioAdmin, EstadoReclamo, Usuario
 from modules.reclamos import Clasificador, Reclamo
 from modules.gestor import Gestor_Reclamos
 from modules.departamentos import Analitica
@@ -13,7 +13,7 @@ from modules.departamentos import Analitica
 
 app = Flask(__name__)
 # Necesario para usar 'session' y 'flash'
-app.secret_key = 'super_secreto_para_la_uner' 
+app.secret_key = 'super_secreto_uner' 
 
 # Definición de Stopwords (se usan en Clasificador)
 STOPWORDS = ["el", "la", "los", "las", "un", "una", "unos", "unas", "y", "o", "de", "a", "en", "es", "para", "que", "del", "al", "se", "con"]
@@ -35,37 +35,41 @@ _DB_DEPARTMENTS = Clasificador.DEPARTAMENTOS_MAP
 def initialize_mock_data():
     """Crea usuarios iniciales (Admin y Final) y algunos reclamos de ejemplo."""
     
+    # CORRECCIÓN CLAVE: Hashear la contraseña de prueba UNA SOLA VEZ
+    try:
+        MOCK_PASS_HASH = Usuario._hash_password("1234")
+    except AttributeError:
+        # Esto ocurre si el método _hash_password no existe o no es estático en Usuario
+        print("\n[ERROR CRÍTICO] Asegúrate de que Usuario._hash_password(\"1234\") sea un método estático válido en usuarios.py.", file=sys.stderr)
+        sys.exit(1)
+    
     # 3.1. Usuarios Administradores (Alta a nivel de sistema - RF 53)
     
     # Jefe de Infraestructura
-    # CORRECCIÓN: Se añade el Claustro.PAYS (Personal de Apoyo y Servicios) para Administradores
-    jd_infra = JefeDepartamento("J001", "jefe.infra@uner.ar", "jinfra", "1234", "Juan", "Perez", 
-                                Claustro.PAYS, # <--- Se pasa el claustro
+    jd_infra = JefeDepartamento("J001", "jefe.infra@uner.ar", "jinfra", MOCK_PASS_HASH, "Juan", "Perez", 
+                                Claustro.PAYS, 
                                 "D_INFRAESTRUCTURA", gestor_reclamos, analitica)
     _DB_USERS[jd_infra.usuario] = jd_infra
     
     # Jefe de Informática
-    # CORRECCIÓN: Se añade el Claustro.PAYS
-    jd_info = JefeDepartamento("J002", "jefe.info@uner.ar", "jinfo", "1234", "Maria", "Gomez", 
-                                Claustro.PAYS, # <--- Se pasa el claustro
+    jd_info = JefeDepartamento("J002", "jefe.info@uner.ar", "jinfo", MOCK_PASS_HASH, "Maria", "Gomez", 
+                                Claustro.PAYS, 
                                 "D_INFORMATICA", gestor_reclamos, analitica)
     _DB_USERS[jd_info.usuario] = jd_info
 
     # Secretaria Técnica
-    # CORRECCIÓN: Se añade el Claustro.PAYS
-    st = SecretarioTecnico("S001", "secre.tec@uner.ar", "stec", "1234", "Ana", "Lopez", 
-                           Claustro.PAYS, # <--- Se pasa el claustro
+    st = SecretarioTecnico("S001", "secre.tec@uner.ar", "stec", MOCK_PASS_HASH, "Ana", "Lopez", 
+                           Claustro.PAYS, 
                            gestor_reclamos, analitica)
     _DB_USERS[st.usuario] = st
     
     # 3.2. Usuarios Finales
     
-    # Los argumentos del UsuarioFinal son correctos si el constructor está arreglado en usuarios.py
-    uf_estudiante = UsuarioFinal("UF001", "estudiante@uner.ar", "user_est", "1234", "Pedro", "García", 
+    uf_estudiante = UsuarioFinal("UF001", "estudiante@uner.ar", "user_est", MOCK_PASS_HASH, "Pedro", "García", 
                                 Claustro.ESTUDIANTE, gestor_reclamos)
     _DB_USERS[uf_estudiante.usuario] = uf_estudiante
     
-    uf_docente = UsuarioFinal("UF002", "docente@uner.ar", "user_doc", "1234", "Laura", "Díaz", 
+    uf_docente = UsuarioFinal("UF002", "docente@uner.ar", "user_doc", MOCK_PASS_HASH, "Laura", "Díaz", 
                              Claustro.DOCENTE, gestor_reclamos)
     _DB_USERS[uf_docente.usuario] = uf_docente
     
@@ -174,6 +178,7 @@ def login():
         else:
             return redirect(url_for('user_menu'))
     else:
+        # Si el login falla, flashea un mensaje y redirige al inicio
         flash("Usuario o contraseña incorrectos.", "danger")
         return redirect(url_for('index'))
 
@@ -195,7 +200,7 @@ def register_post():
         return redirect(url_for('register'))
         
     try:
-        # CORRECCIÓN CLAVE: Obtener la instancia del Enum Claustro
+        # Obtener la instancia del Enum Claustro
         claustro_instance = Claustro[claustro_key.upper()] 
     except KeyError:
         flash(f"Error: La opción de claustro '{claustro_key}' no es válida.", "danger")
@@ -215,6 +220,7 @@ def register_post():
     new_user_data = UsuarioFinal.registro_usuario(_DB_USERS, **data)
     
     if not new_user_data:
+        # El mensaje flash se usa para dar feedback al usuario, incluso si ya se imprimió en consola.
         flash("Error en el registro. Verifica que las contraseñas coincidan y que el email/usuario no existan.", "danger")
         return redirect(url_for('register'))
 
@@ -224,11 +230,7 @@ def register_post():
     new_user_id = f"UF{len(_DB_USERS) + 1:03d}"
     
     # B. Preparar los datos para el constructor
-    # Capturamos contrasenia_hash que se genera en registro_usuario.
     contrasenia_hash = new_user_data.pop('contrasenia_hash', None)
-    
-    # Eliminamos 'id' por si el método estático lo generó, lo que causaría TypeError.
-    # El ID se pasa explícitamente en el constructor como 'id_usuario'.
     if 'id' in new_user_data:
         del new_user_data['id']
         
@@ -249,7 +251,6 @@ def register_post():
             gestor_servicio=gestor_reclamos
         )
     except TypeError as e:
-        # Imprime el error exacto en la consola para debugging
         print(f"[ERROR CRÍTICO AL CREAR USUARIO] Tipo de error: {e}", file=sys.stderr)
         flash("Error interno al crear la cuenta. Los argumentos del constructor no coinciden.", "danger")
         return redirect(url_for('register'))
@@ -487,8 +488,6 @@ def generar_reporte():
         # Jefe de Departamento solo puede reportar el suyo
         depto_id_reporte = user.get_departamento_id()
 
-    # Validación de permiso implícita: si el Jefe intenta reportar otro, 
-    # se le fuerza a usar su depto_id.
     
     # Este método DEBE existir en las clases Admin (o su Mixin)
     reporte_content = user.generar_reporte(depto_id_reporte, formato) 

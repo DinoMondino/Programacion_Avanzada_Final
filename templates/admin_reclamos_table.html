@@ -1,45 +1,40 @@
-<h3>Reclamos Asignados</h3>
-{% if reclamos_del_depto|length > 0 %}
+<div class="card shadow-sm mt-3">
     <div class="table-responsive">
-        <table class="table table-striped table-bordered table-hover shadow-sm">
-            <thead class="bg-primary text-white">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
                 <tr>
-                    <th>ID Reclamo</th>
-                    <th>ID Creador</th>
-                    <th>Adheridos (Total)</th>
-                    <th>Fecha/Hora</th>
+                    <th>ID</th>
                     <th>Contenido</th>
-                    <th>Estado Actual</th>
-                    <th>Cambiar Estado</th>
+                    <th><i class="bi bi-people-fill"></i></th>
+                    <th>Estado</th>
+                    <th>Acción</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in reclamos_del_depto %}
                 <tr>
-                    <td>{{ r.id }}</td>
-                    <td>{{ r.usuario_creator_id }}</td>
+                    <td><small class="text-muted">{{ r.id }}</small></td>
+                    <td>{{ r.contenido[:60] }}...</td>
+                    <td><span class="badge bg-secondary">{{ r.get_num_adherentes() }}</span></td>
                     <td>
-                        {{ r.get_num_adherentes() }}
-                        </td>
-                    <td>{{ r.fecha_creacion.strftime('%Y-%m-%d %H:%M') }}</td>
-                    <td>{{ r.contenido[:50] }}...</td>
-                    <td><span class="badge 
-                        {% if r.estado.name == 'PENDIENTE' %} bg-warning text-dark
-                        {% elif r.estado.name == 'EN_PROCESO' %} bg-info
-                        {% elif r.estado.name == 'RESUELTO' %} bg-success
-                        {% elif r.estado.name == 'INVALIDO' %} bg-danger
-                        {% endif %}">
-                        {{ r.estado.value|upper }}
-                    </span></td>
+                        <span class="badge 
+                            {% if r.estado.name == 'PENDIENTE' %}bg-warning text-dark
+                            {% elif r.estado.name == 'EN_PROCESO' %}bg-info
+                            {% elif r.estado.name == 'RESUELTO' %}bg-success
+                            {% else %}bg-danger{% endif %}">
+                            {{ r.estado.value }}
+                        </span>
+                    </td>
                     <td>
-                        <form action="{{ url_for('actualizar_estado_reclamo') }}" method="post">
-                            <input type="hidden" name="reclamo_id" value="{{ r.id }}">
-                            <select class="form-select form-select-sm mb-2" name="nuevo_estado">
-                                {% for estado in estados_posibles %}
-                                    <option value="{{ estado.name }}" {% if r.estado.name == estado.name %}selected{% endif %}>{{ estado.value|upper }}</option>
-                                {% endfor %}
+                        <form action="{{ url_for('actualizar_estado') }}" method="post" class="d-flex gap-1">
+                            <input type="hidden" name="id_reclamo" value="{{ r.id }}">
+                            <select name="nuevo_estado" class="form-select form-select-sm">
+                                <option value="PENDIENTE">Pendiente</option>
+                                <option value="EN_PROCESO">En Proceso</option>
+                                <option value="RESUELTO">Resuelto</option>
+                                <option value="INVALIDO">Inválido</option>
                             </select>
-                            <button type="submit" class="btn btn-sm btn-primary w-100">Actualizar</button>
+                            <button type="submit" class="btn btn-sm btn-primary">✔</button>
                         </form>
                     </td>
                 </tr>
@@ -47,8 +42,4 @@
             </tbody>
         </table>
     </div>
-{% else %}
-    <div class="alert alert-info text-center">
-        No hay reclamos asignados a este departamento.
-    </div>
-{% endif %}
+</div>

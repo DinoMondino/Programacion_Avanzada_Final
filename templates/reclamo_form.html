@@ -1,32 +1,29 @@
 {% extends "base.html" %}
 
-{% block title %}Crear Nuevo Reclamo{% endblock %}
-
 {% block content %}
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <h1 class="text-center mb-4" style="color: #004d40;">Crear Nuevo Reclamo</h1>
-            <p class="text-center">Describe tu problema o sugerencia con el mayor detalle posible.</p>
-            
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <form action="{{ url_for('crear_reclamo_post') }}" method="post">
-                        
-                        <div class="mb-3">
-                            <label for="contenido" class="form-label">Detalle del Problema (Contenido del Reclamo)</label>
-                            <textarea class="form-control" id="contenido" name="contenido" rows="6" required placeholder="Ej: No funciona el aire acondicionado del aula 5."></textarea>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="adjunto_url" class="form-label">Adjuntar Foto (Opcional)</label>
-                            <input type="text" class="form-control" id="adjunto_url" name="adjunto_url" placeholder="Ej: url/a/la/foto_del_problema.jpg">
-                            <div class="form-text">Si usas un *input type="file"*, el formulario debe ser `enctype="multipart/form-data"`.</div>
-                                                    </div>
-
-                        <button type="submit" class="btn btn-primary w-100 mt-3" style="background-color: #004d40; border-color: #004d40;">Clasificar y Enviar Reclamo</button>
-                    </form>
-                </div>
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <h2 class="text-center mb-4">Nuevo Reclamo</h2>
+                <form action="{{ url_for('crear_reclamo_post') }}" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Describe el problema:</label>
+                        <textarea name="contenido" class="form-control" rows="5" required 
+                                  placeholder="Sé lo más específico posible..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">URL de imagen (opcional):</label>
+                        <input type="text" name="adjunto_url" class="form-control" placeholder="http://...">
+                    </div>
+                    <div class="alert alert-info py-2">
+                        <small><i class="bi bi-robot"></i> Nuestro sistema clasificará automáticamente tu reclamo al enviarlo.</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2">Enviar Reclamo</button>
+                    <a href="{{ url_for('user_menu') }}" class="btn btn-link w-100 text-secondary mt-2">Cancelar</a>
+                </form>
             </div>
         </div>
     </div>
+</div>
 {% endblock %}

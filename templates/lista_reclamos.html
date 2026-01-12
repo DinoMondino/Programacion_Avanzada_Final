@@ -1,93 +1,73 @@
 {% extends "base.html" %}
 
-{% block title %}{{ titulo_listado }}{% endblock %}
-
 {% block content %}
-    <h1 class="mb-4" style="color: #004d40;">{{ titulo_listado }}</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 style="color: #004d40;">{{ titulo_listado }}</h2>
+    <a href="{{ url_for('user_menu') }}" class="btn btn-outline-secondary btn-sm">Volver</a>
+</div>
 
-    {% if es_listado_global %}
-    <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-            <form action="{{ url_for('listar_reclamos') }}" method="get" class="row align-items-center">
-                <div class="col-md-4">
-                    <label for="depto_id" class="form-label mb-0">Filtrar por Departamento:</label>
-                </div>
-                <div class="col-md-5">
-                    <select class="form-select" id="depto_id" name="depto_id">
-                        <option value="">Mostrar Todos</option>
-                        {% for depto_id, depto_nombre in departamentos.items() %}
-                            <option value="{{ depto_id }}" {% if depto_id == filtro_actual %}selected{% endif %}>{{ depto_nombre }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <button type="submit" class="btn btn-secondary w-100">Filtrar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    {% endif %}
-
-    {% if reclamos|length > 0 %}
-        <div class="table-responsive">
-            <table class="table table-striped table-hover shadow-sm">
-                <thead class="bg-dark text-white">
-                    <tr>
-                        <th>ID</th>
-                        <th>Estado</th>
-                        <th>Fecha/Hora</th>
-                        <th>Departamento</th>
-                        <th>Adherentes</th>
-                        <th>Contenido</th>
-                        {% if es_listado_global %}
-                            <th>Acción</th>
-                        {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for r in reclamos %}
-                    <tr>
-                        <td>{{ r.ID }}</td>
-                        <td>
-                            <span class="badge 
-                            {% if r.Estado == 'pendiente' %} bg-warning text-dark
-                            {% elif r.Estado == 'en_proceso' %} bg-info
-                            {% elif r.Estado == 'resuelto' %} bg-success
-                            {% elif r.Estado == 'inválido' %} bg-danger
-                            {% endif %}">
-                                {{ r.Estado|upper }}
-                            </span>
-                        </td>
-                        <td>{{ r.Fecha }}</td>
-                        <td>{{ r.Departamento }}</td>
-                        <td>{{ r.Adherentes }}</td>
-                        <td>{{ r.Contenido }}</td>
-                        
-                        {% if es_listado_global %}
-                            <td>
-                                {% if r.Puede_Adherirse %}
-                                    <form action="{{ url_for('adherirse_reclamo') }}" method="post" style="display: inline;">
-                                        <input type="hidden" name="reclamo_id" value="{{ r.ID }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-primary">Adherirse</button>
-                                    </form>
-                                {% else %}
-                                    <button class="btn btn-sm btn-light" disabled>No Adherible</button>
-                                {% endif %}
-                            </td>
-                        {% endif %}
-                    </tr>
+{% if es_listado_global %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form action="{{ url_for('listar_reclamos') }}" method="get" class="row g-2 align-items-end">
+            <div class="col-md-8">
+                <label class="form-label small fw-bold">Filtrar por Departamento:</label>
+                <select class="form-select" name="depto_id">
+                    <option value="">Todos los departamentos</option>
+                    {% for id, nombre in departamentos.items() %}
+                        <option value="{{ id }}" {% if id == filtro_actual %}selected{% endif %}>{{ nombre }}</option>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% else %}
-        <div class="alert alert-info text-center">
-            No se encontraron reclamos en este listado.
-        </div>
-    {% endif %}
-    
-    <div class="text-center mt-4">
-        <a href="{{ url_for('user_menu') }}" class="btn btn-secondary">Volver al Menú</a>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-secondary w-100">Aplicar Filtro</button>
+            </div>
+        </form>
     </div>
+</div>
+{% endif %}
 
+<div class="table-responsive bg-white rounded shadow-sm p-3">
+    <table class="table table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Estado</th>
+                <th>Contenido</th>
+                <th>Depto</th>
+                <th><i class="bi bi-people"></i></th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in reclamos %}
+            <tr>
+                <td>
+                    <span class="badge rounded-pill 
+                        {% if r.estado.name == 'PENDIENTE' %}bg-warning text-dark
+                        {% elif r.estado.name == 'EN_PROCESO' %}bg-info
+                        {% elif r.estado.name == 'RESUELTO' %}bg-success
+                        {% else %}bg-secondary{% endif %}">
+                        {{ r.estado.value }}
+                    </span>
+                </td>
+                <td><small>{{ r.contenido[:80] }}...</small></td>
+                <td><span class="text-muted small">{{ r.departamento_id }}</span></td>
+                <td>{{ r.get_num_adherentes() }}</td>
+                <td>
+                    {% if es_listado_global and r.usuario_creator_id != current_user.id %}
+                        <form action="{{ url_for('adherirse_reclamo') }}" method="post">
+                            <input type="hidden" name="reclamo_id" value="{{ r.id }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">Adherirse</button>
+                        </form>
+                    {% else %}
+                        <span class="text-muted small">Tu Reclamo</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center py-4 text-muted">No hay reclamos para mostrar.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endblock %}

@@ -1,132 +1,71 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard Admin{% endblock %}
-
-{% block nav_links %}
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('logout') }}">Salir 🚪</a>
-    </li>
-{% endblock %}
-
 {% block content %}
-    <h1 class="text-center mb-5" style="color: #004d40;">Dashboard - {{ current_user.get_role_name() }}</h1>
-    <h3 class="text-center mb-4">
-        Departamento: 
-        <span class="badge bg-primary">{{ 'Todos' if current_user.get_departamento_id() == 'ALL' else current_user.get_departamento_id() }}</span>
-    </h3>
-
-    <ul class="nav nav-tabs" id="adminTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="analitica-tab" data-bs-toggle="tab" data-bs-target="#analitica" type="button" role="tab" aria-controls="analitica" aria-selected="true">📊 Analítica</button>
+<div class="container">
+    <h1 class="mb-4">Dashboard: {{ current_user.rol_admin.value }}</h1>
+    
+    <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#analitica">📊 Analítica</button>
         </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="manejar-tab" data-bs-toggle="tab" data-bs-target="#manejar" type="button" role="tab" aria-controls="manejar" aria-selected="false">⚙️ Manejar Reclamos</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="ayuda-tab" data-bs-toggle="tab" data-bs-target="#ayuda" type="button" role="tab" aria-controls="ayuda" aria-selected="false">❓ Ayuda</button>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#gestion">⚙️ Gestión de Reclamos</button>
         </li>
     </ul>
 
-    <div class="tab-content pt-3" id="adminTabsContent">
-        
-        <div class="tab-pane fade show active" id="analitica" role="tabpanel" aria-labelledby="analitica-tab">
-            <div class="card shadow-sm p-4">
-                <h2>Estadísticas y Reportes</h2>
-                
-                <div class="mb-4 p-3 border rounded bg-light">
-                    <h4>Generar Reporte</h4>
-                    <form action="{{ url_for('generar_reporte') }}" method="post" class="row g-3">
-                        <div class="col-auto">
-                            <label for="formato_reporte" class="form-label">Formato:</label>
-                        </div>
-                        <div class="col-auto">
-                            <select class="form-select" id="formato_reporte" name="formato" required>
-                                <option value="HTML">HTML</option>
-                                <option value="PDF">PDF (Simulación)</option>
-                            </select>
-                        </div>
-                        {% if current_user.get_departamento_id() == 'ALL' %}
-                            <div class="col-auto">
-                                <label for="depto_reporte" class="form-label">Departamento:</label>
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="analitica">
+            <div class="row">
+                <div class="col-md-5">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white"><h5>Distribución de Estados</h5></div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between">
+                                    Pendientes <span class="badge bg-warning text-dark">{{ data_analitica.stats.pendientes }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    En Proceso <span class="badge bg-info">{{ data_analitica.stats.en_proceso }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    Resueltos <span class="badge bg-success">{{ data_analitica.stats.resueltos }}</span>
+                                </li>
+                            </ul>
+                            <div class="mt-3 text-center">
+                                <small>Total de reclamos: {{ data_analitica.total }}</small>
                             </div>
-                            <div class="col-auto">
-                                <select class="form-select" id="depto_reporte" name="departamento_id" required>
-                                    {% for depto_id, depto_nombre in todos_los_deptos.items() %}
-                                        <option value="{{ depto_id }}">{{ depto_nombre }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        {% else %}
-                            <input type="hidden" name="departamento_id" value="{{ current_user.get_departamento_id() }}">
-                        {% endif %}
-                        <div class="col-auto">
-                            <button type="submit" class="btn btn-success">Generar</button>
-                        </div>
-                    </form>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <h4>Diagrama Circular de Estados</h4>
-                        <div class="alert alert-secondary">
-                                                        <p>Visualización del porcentaje de reclamos (En Proceso, Resueltos, Inválidos, Pendientes).</p>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <h4>Frecuencia de Palabras Clave (Nube)</h4>
-                        <div class="alert alert-secondary">
-                                                        <p>Las 15 palabras más frecuentes se muestran con tamaño proporcional a su frecuencia.</p>
+                </div>
+
+                <div class="col-md-7">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white"><h5>Nube de Palabras Clave (RF 56)</h5></div>
+                        <div class="card-body d-flex flex-wrap align-items-center justify-content-center" style="min-height: 200px;">
+                            {% if data_analitica.frecuencia %}
+                                {% for palabra, cuenta in data_analitica.frecuencia.items() %}
+                                    <span class="badge rounded-pill m-1" 
+                                          style="font-size: {{ 12 + (cuenta * 4) }}px; background-color: #e0f2f1; color: #004d40; border: 1px solid #004d40;">
+                                        {{ palabra }}
+                                    </span>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted">No hay datos suficientes para generar la nube.</p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="tab-pane fade" id="manejar" role="tabpanel" aria-labelledby="manejar-tab">
-            <div class="card shadow-sm p-4">
-                <h2>Listado y Gestión de Reclamos</h2>
-                
-                {% if current_user.get_role_name() == 'Secretario' %}
-                    <div class="alert alert-warning mb-4">
-                        <h4>Derivar Reclamo (RF 60)</h4>
-                        <form action="{{ url_for('derivar_reclamo') }}" method="post" class="row g-3 align-items-end">
-                            <div class="col-md-4">
-                                <label for="reclamo_id_derivar" class="form-label">ID Reclamo:</label>
-                                <input type="text" class="form-control" id="reclamo_id_derivar" name="reclamo_id" required placeholder="Ej: R001">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="nuevo_depto_id" class="form-label">Nuevo Departamento:</label>
-                                <select class="form-select" id="nuevo_depto_id" name="nuevo_depto_id" required>
-                                    {% for depto_id, depto_nombre in todos_los_deptos.items() %}
-                                        <option value="{{ depto_id }}">{{ depto_nombre }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <button type="submit" class="btn btn-danger w-100">Derivar</button>
-                            </div>
-                        </form>
-                    </div>
-                {% endif %}
-
-                {% include 'admin_reclamos_table.html' %}
-                
+            
+            <div class="text-end">
+                <a href="{{ url_for('descargar_reporte', formato='pdf') }}" class="btn btn-outline-danger">Descargar PDF</a>
+                <a href="{{ url_for('descargar_reporte', formato='html') }}" class="btn btn-outline-primary">Ver Reporte Web</a>
             </div>
         </div>
 
-        <div class="tab-pane fade" id="ayuda" role="tabpanel" aria-labelledby="ayuda-tab">
-            <div class="card shadow-sm p-4">
-                <h2>Guía de Uso del Dashboard</h2>
-                <p>Este es el tutorial/guía de uso del panel de control para administradores (Jefes y Secretarios Técnicos).</p>
-                <ul>
-                    <li>**Analítica:** Aquí puede ver las estadísticas de los reclamos de su departamento, incluyendo porcentajes por estado (diagrama circular) y las palabras clave más frecuentes (nube de palabras). Use el botón "Generar Reporte" para descargar los datos en HTML o PDF.</li>
-                    <li>**Manejar Reclamos:** Lista todos los reclamos asociados a su área. Puede modificar el estado de cada reclamo.</li>
-                    {% if current_user.get_role_name() == 'Secretario' %}
-                    <li>**Secretaría Técnica:** El Secretario Técnico tiene la funcionalidad adicional de **Derivar Reclamos** a cualquier otro departamento desde este panel.</li>
-                    {% endif %}
-                </ul>
-            </div>
+        <div class="tab-pane fade" id="gestion">
+            {% include 'admin_reclamos_table.html' %}
         </div>
-        
     </div>
+</div>
 {% endblock %}
