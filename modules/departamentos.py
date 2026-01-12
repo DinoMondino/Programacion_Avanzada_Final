@@ -105,3 +105,15 @@ class Analitica:
         # Genera reporte en formato PDF, se devuelve su ruta.
         print(f"Generando PDF para depto {departamento_id}...")
         return f"reporte_{departamento_id}.pdf"
+    
+    def obtener_datos_dashboard(self, depto_id: str):
+        """RF 54: Retorna estadísticas unificadas para la UI y Tests."""
+        stats = self.get_estadisticas_generales(depto_id)
+        # Aseguramos que existan las claves que el test 'test_gestor_y_analitica.py' busca
+        return {
+            "total": stats.get("total_reclamos", 0),
+            "pendientes": stats.get("pendientes", 0),
+            "resueltos": stats.get("resueltos_porcentaje", 0),
+            "stats": stats,
+            "frecuencia": self.get_frecuencia_palabras(depto_id)
+        }

@@ -100,6 +100,9 @@ class SecretarioTecnico(UsuarioAdmin):
         # El Secretario tiene alcance global
         super().__init__(rol_admin=RolAdmin.SECRETARIO, departamento_id="ALL", **kwargs)
 
+    def listar_reclamos_pendientes(self):
+        return self.listar_reclamos_pendientes_admin()
+
     def derivar_reclamo(self, reclamo_id: str, nuevo_depto_id: str) -> bool:
         # Función exclusiva de Secretaría Técnica.
         return self._gestor_reclamos.derivar_reclamo(reclamo_id, nuevo_depto_id)
@@ -120,3 +123,9 @@ class UsuarioFinal(Usuario):
 
     def get_role_name(self) -> str:
         return self.claustro.value
+    
+    def ver_mis_reclamos(self):
+        """Devuelve la lista de reclamos del usuario."""
+        if self.gestor_servicio:
+            return self.gestor_servicio.obtener_reclamos_por_usuario(self.id_usuario)
+        return []

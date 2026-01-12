@@ -92,8 +92,32 @@ class Clasificador:
 
         return {"departamento_id": depto_id}
 
+
     def extraer_palabras_clave(self, contenido: str) -> List[str]:
         # Limpia el contenido para la nube de palabras. Elimina puntuación y stopwords.
         palabras = contenido.lower().split()
         return [p.strip('.,;!?"') for p in palabras 
                 if p.strip('.,;!?"') not in self.stopwords and len(p) > 2]
+    
+    def encontrar_similares(self, contenido: str, historial_reclamos: dict) -> list:
+        """
+        RF 40: Busca reclamos similares comparando la coincidencia de palabras clave.
+        Si comparten 2 o más palabras clave, se considera similar.
+        """
+        # 1. Extraemos palabras clave del nuevo reclamo (filtrando stopwords)
+        palabras_nuevo = set(self.extraer_palabras_clave(contenido))
+        similares_ids = []
+
+        # 2. Recorremos los reclamos existentes en la "DB"
+        for reclamo_id, reclamo_obj in historial_reclamos.items():
+            # Extraemos palabras clave del reclamo viejo
+            palabras_viejo = set(self.extraer_palabras_clave(reclamo_obj.contenido))
+            
+            # 3. Calculamos la intersección (palabras que aparecen en ambos)
+            coincidencias = palabras_nuevo.intersection(palabras_viejo)
+            
+            # 4. Si hay suficiente similitud (umbral de 2 palabras), guardamos el ID
+            if len(coincidencias) >= 2:
+                similares_ids.append(reclamo_id)
+        
+        return similares_ids
