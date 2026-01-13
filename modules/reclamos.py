@@ -6,10 +6,7 @@ class EstadoReclamo(Enum):
     INVALIDO = "inválido"
     PENDIENTE = "pendiente"
     EN_PROCESO = "en_proceso"
-    RESUELTO = "resueltos" # Ajustado para coincidir con reportes
-
-def generar_notificacion(id_usuario: str, mensaje: str):
-    print(f"    [NOTIFICACION] -> Usuario {id_usuario}: {mensaje}")
+    RESUELTO = "resuelto"
 
 class Reclamo:
     def __init__(self, id_reclamo: str, contenido: str, usuario_creator_id: str, 
@@ -25,6 +22,7 @@ class Reclamo:
         self.estado = estado
         self.palabras_clave = palabras_clave or []
         self.adjunto_url = adjunto_url
+        # [CAMBIO] Se asegura que siempre haya un timestamp de creación
         self.fecha_creacion = fecha_creacion or datetime.datetime.now()
         self.adherentes_ids = adherentes_ids or []
 
@@ -33,6 +31,7 @@ class Reclamo:
 
     def __repr__(self):
         return f"<Reclamo {self.id} - {self.estado.value}>"
+
 
 class Clasificador:
     def __init__(self, stopwords: List[str]):

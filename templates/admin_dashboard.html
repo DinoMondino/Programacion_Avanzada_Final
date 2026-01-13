@@ -1,15 +1,18 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container">
-    <h1 class="mb-4">Dashboard: {{ current_user.rol_admin.value }}</h1>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Dashboard: {{ current_user.rol_admin.value }}</h1>
+        <span class="badge bg-primary">{{ current_user.nombre }} {{ current_user.apellido }}</span>
+    </div>
     
     <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
         <li class="nav-item">
             <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#analitica">📊 Analítica</button>
         </li>
         <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#gestion">⚙️ Gestión de Reclamos</button>
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#gestion">⚙️ Gestión</button>
         </li>
     </ul>
 
@@ -30,41 +33,87 @@
                                 <li class="list-group-item d-flex justify-content-between">
                                     Resueltos <span class="badge bg-success">{{ data_analitica.stats.resueltos }}</span>
                                 </li>
+                                <li class="list-group-item d-flex justify-content-between fw-bold">
+                                    Total <span class="text-primary">{{ data_analitica.stats.total }}</span>
+                                </li>
                             </ul>
-                            <div class="mt-3 text-center">
-                                <small>Total de reclamos: {{ data_analitica.total }}</small>
-                            </div>
                         </div>
                     </div>
                 </div>
-
+                
                 <div class="col-md-7">
                     <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-white"><h5>Nube de Palabras Clave (RF 56)</h5></div>
-                        <div class="card-body d-flex flex-wrap align-items-center justify-content-center" style="min-height: 200px;">
+                        <div class="card-header bg-white"><h5>Nube de Palabras Clave (RF 131)</h5></div>
+                        <div class="card-body d-flex flex-wrap align-items-center justify-content-center">
                             {% if data_analitica.frecuencia %}
                                 {% for palabra, cuenta in data_analitica.frecuencia.items() %}
-                                    <span class="badge rounded-pill m-1" 
-                                          style="font-size: {{ 12 + (cuenta * 4) }}px; background-color: #e0f2f1; color: #004d40; border: 1px solid #004d40;">
-                                        {{ palabra }}
+                                    <span class="badge bg-light text-dark border m-1" style="font-size: 1.2rem;">
+                                        {{ palabra }} ({{ cuenta }})
                                     </span>
                                 {% endfor %}
                             {% else %}
-                                <p class="text-muted">No hay datos suficientes para generar la nube.</p>
+                                <p class="text-muted">Sin datos suficientes para la nube.</p>
                             {% endif %}
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <div class="text-end">
-                <a href="{{ url_for('descargar_reporte', formato='pdf') }}" class="btn btn-outline-danger">Descargar PDF</a>
-                <a href="{{ url_for('descargar_reporte', formato='html') }}" class="btn btn-outline-primary">Ver Reporte Web</a>
-            </div>
         </div>
 
         <div class="tab-pane fade" id="gestion">
-            {% include 'admin_reclamos_table.html' %}
+            <div class="card shadow-sm">
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID / Fecha</th>
+                                <th>Usuarios (Creador/Adherentes)</th>
+                                <th>Contenido</th>
+                                <th>Estado / Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rec in reclamos_del_depto %}
+                            <tr>
+                                <td>
+                                    <strong>{{ rec.id }}</strong><br>
+                                    <small class="text-muted">{{ rec.fecha_creacion.strftime('%d/%m %H:%M') }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">Autor: {{ rec.usuario_creator_id }}</span><br>
+                                    <small>Adherentes: {{ rec.adherentes_ids|join(', ') or '0' }}</small>
+                                </td>
+                                <td>{{ rec.contenido[:50] }}...</td>
+                                <td>
+                                    <form action="{{ url_for('actualizar_estado') }}" method="post" class="mb-1">
+                                        <input type="hidden" name="id_reclamo" value="{{ rec.id }}">
+                                        <select name="nuevo_estado" onchange="this.form.submit()" class="form-select form-select-sm">
+                                            <option value="" disabled selected>{{ rec.estado.value }}</option>
+                                            <option value="pendiente">Pendiente</option>
+                                            <option value="en_proceso">En Proceso</option>
+                                            <option value="resuelto">Resuelto</option>
+                                            <option value="inválido">Inválido</option>
+                                        </select>
+                                    </form>
+
+                                    {% if current_user.rol_admin.value == "Secretario Técnico" %}
+                                    <form action="{{ url_for('derivar_reclamo') }}" method="post">
+                                        <input type="hidden" name="id_reclamo" value="{{ rec.id }}">
+                                        <select name="nuevo_depto" onchange="this.form.submit()" class="form-select form-select-sm border-primary">
+                                            <option value="" disabled selected>Derivar a...</option>
+                                            <option value="D_INFRAESTRUCTURA">Infraestructura</option>
+                                            <option value="D_INFORMATICA">Informática</option>
+                                            <option value="D_SECRETARIA">Secretaría</option>
+                                        </select>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>

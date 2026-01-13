@@ -42,8 +42,8 @@ class UsuarioFinal(Usuario):
 
     def ver_mis_reclamos(self):
         """Retorna los reclamos creados por este usuario."""
-        return self._gestor_reclamos.get_mis_reclamos(self.id)
-
+        return [r for r in self._gestor_reclamos._reclamos_db.values() if r.usuario_creator_id == self.id]
+    
 class JefeDepartamento(Usuario):
     def __init__(self, **kwargs):
         super().__init__(rol_admin=RolAdmin.JEFE, **kwargs)
@@ -55,19 +55,16 @@ class JefeDepartamento(Usuario):
         return self._gestor_reclamos.gestionar_reclamo(reclamo_id, nuevo_estado)
 
     def listar_reclamos_pendientes_admin(self):
-        return self._gestor_reclamos.get_reclamos_por_departamento(self.departamento_id)
-    
-    def listar_reclamos_pendientes(self):
-        # Alias para que el dashboard no rompa.
-        return self.listar_reclamos_pendientes_admin()
+        # Filtra solo los de su departamento
+        return [r for r in self._gestor_reclamos._reclamos_db.values() if r.departamento_id == self.departamento_id]
 
 class SecretarioTecnico(Usuario):
     def __init__(self, **kwargs):
         super().__init__(rol_admin=RolAdmin.SECRETARIO, departamento_id="ALL", **kwargs)
 
-    def listar_reclamos_pendientes(self):
-        return self.listar_reclamos_pendientes_admin()
-
     def listar_reclamos_pendientes_admin(self):
         # El secretario ve todos los reclamos en la DB
         return list(self._gestor_reclamos._reclamos_db.values())
+    
+    def derivar_reclamo(self, reclamo_id, nuevo_depto):
+        return self._gestor_reclamos.derivar_reclamo(reclamo_id, nuevo_depto)

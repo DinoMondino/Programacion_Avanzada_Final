@@ -138,6 +138,18 @@ def actualizar_estado():
     user.gestionar_reclamo(id_rec, EstadoReclamo[nuevo_est.upper()])
     return redirect(url_for('admin_dashboard'))
 
+@app.route('/derivar_reclamo', methods=['POST'])
+@login_required
+def derivar_reclamo():
+    user = _DB_USERS.get(session['username'])
+    # Solo el secretario puede acceder a esta ruta
+    if user.rol_admin == RolAdmin.SECRETARIO:
+        id_rec = request.form.get('id_reclamo')
+        nuevo_depto = request.form.get('nuevo_depto')
+        if user.derivar_reclamo(id_rec, nuevo_depto):
+            flash(f"Reclamo {id_rec} derivado a {nuevo_depto}", "success")
+    return redirect(url_for('admin_dashboard'))
+
 @app.route('/descargar_reporte/<formato>')
 @login_required
 def descargar_reporte(formato):
