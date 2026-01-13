@@ -109,10 +109,25 @@ def adherirse(id_reclamo):
 @login_required
 def admin_dashboard():
     user = _DB_USERS.get(session['username'])
-    depto_id = user.departamento_id if user.rol_admin == RolAdmin.JEFE else "D_INFRAESTRUCTURA"
-    data_dash = analitica_servicio.obtener_datos_dashboard(depto_id)
-    reclamos = user.listar_reclamos_pendientes_admin()
-    return render_template('admin_dashboard.html', current_user=user, data_analitica=data_dash, reclamos_del_depto=reclamos)
+    if user.rol_admin == RolAdmin.NINGUNO:
+        return redirect(url_for('user_dashboard'))
+    
+    # --- CORRECCIÓN AQUÍ ---
+    if user.rol_admin == RolAdmin.JEFE:
+        # El Jefe solo ve su departamento
+        depto_id = user.departamento_id
+        data_dash = analitica_servicio.obtener_datos_dashboard(depto_id)
+        reclamos = user.listar_reclamos_pendientes_admin()
+    else:
+        # El Secretario ve TODO (pasamos None o un ID global si tu analitica lo soporta)
+        # Si depto_id es None, el gestor debería devolver el total general
+        data_dash = analitica_servicio.obtener_datos_dashboard(None) 
+        reclamos = user.listar_reclamos_pendientes_admin()
+    
+    return render_template('admin_dashboard.html', 
+                           current_user=user,
+                           data_analitica=data_dash,
+                           reclamos_del_depto=reclamos)
 
 @app.route('/actualizar_estado', methods=['POST'])
 @login_required
@@ -142,7 +157,15 @@ if __name__ == '__main__':
         claustro=Claustro.PAYS, departamento_id="D_INFRAESTRUCTURA",
         gestor_servicio=gestor_reclamos, analitica_servicio=analitica_servicio
     )
-    
+
+    _DB_USERS['secretario'] = SecretarioTecnico(
+        id_usuario="SEC01", email="secretario@uner.edu.ar", usuario="secretario",
+        contrasenia_hash="hash", nombre="Ana", apellido="Lopez",
+        claustro=Claustro.PAYS, 
+        gestor_servicio=gestor_reclamos, 
+        analitica_servicio=analitica_servicio
+    )
+
     _DB_USERS['estudiante1'] = UsuarioFinal(
         id_usuario="USR01", email="juan@uner.edu.ar", usuario="estudiante1",
         contrasenia_hash="hash", nombre="Juan", apellido="Perez",
@@ -155,4 +178,27 @@ if __name__ == '__main__':
         claustro=Claustro.ESTUDIANTE, gestor_servicio=gestor_reclamos
     )
 
+# --- 2. PRECARGA DE RECLAMOS (Creados por estudiante2) ---
+    # Reclamo 1: Infraestructura (por palabras clave como 'techo' o 'baño')
+    gestor_reclamos.crear_reclamo(
+        contenido="Hay una filtración en el techo del aula 6, gotea mucho cuando llueve.",
+        adjunto=None,
+        usuario_creator_id="USR02"
+    )
+
+    # Reclamo 2: Infraestructura (por palabras clave como 'puerta' o 'vidrio')
+    gestor_reclamos.crear_reclamo(
+        contenido="La puerta del baño de mujeres del modulo 2 está rota.",
+        adjunto=None,
+        usuario_creator_id="USR02"
+    )
+
+    # Reclamo 3: General/Otro (para que no vaya todo al mismo lugar)
+    gestor_reclamos.crear_reclamo(
+        contenido="Estaría bueno tener más opciones de comida saludable en el comedor.",
+        adjunto=None,
+        usuario_creator_id="USR02"
+    )
+
+    print("Servidor iniciado con usuarios y 3 reclamos de prueba cargados.")
     app.run(debug=True, port=5000)

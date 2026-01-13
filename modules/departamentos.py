@@ -26,16 +26,26 @@ class Analitica:
         palabras = [p for p in todo_el_texto.lower().split() if len(p) > 3]
         return dict(Counter(palabras))
     
-    def obtener_datos_dashboard(self, depto_id: str):
-        """RF 54: Retorna estadísticas unificadas para la UI y Tests."""
-        stats = self.get_estadisticas_generales(depto_id)
-        frecuencia = self.get_frecuencia_palabras(depto_id)
+    def obtener_datos_dashboard(self, depto_id=None):
+        # Si depto_id es None, traemos todos los reclamos de la DB
+        if depto_id:
+            reclamos = [r for r in self._gestor._reclamos_db.values() 
+                        if r.departamento_id == depto_id]
+        else:
+            reclamos = list(self._gestor._reclamos_db.values())
+
+        # Contamos según el estado
+        pendientes = sum(1 for r in reclamos if r.estado.value == "pendiente")
+        en_proceso = sum(1 for r in reclamos if r.estado.value == "en_proceso")
+        resueltos = sum(1 for r in reclamos if r.estado.value == "resuelto")
+
         return {
-            "total": stats["total_reclamos"],
-            "pendientes": stats["pendientes"],
-            "resueltos": stats["resueltos_porcentaje"],
-            "stats": stats, # Agregamos esta clave que el test está buscando
-            "frecuencia": frecuencia
+            "stats": {
+                "pendientes": pendientes,
+                "en_proceso": en_proceso,
+                "resueltos": resueltos,
+                "total": len(reclamos)
+            }
         }
 
     def generar_reporte_html(self, depto_id: str, stats: dict = None, frecuencia: dict = None) -> str:
