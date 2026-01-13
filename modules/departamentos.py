@@ -28,34 +28,37 @@ class Analitica:
         palabras = [p for p in todo_el_texto.lower().split() if len(p) > 3]
         return dict(Counter(palabras))
     
-    def obtener_datos_dashboard(self, depto_id=None):
-        # Si depto_id es None, traemos todos los reclamos de la DB
-        if depto_id:
-            reclamos = [r for r in self._gestor._reclamos_db.values() if r.departamento_id == depto_id]
-        else:
-            reclamos = list(self._gestor._reclamos_db.values())
+    # modules/departamentos.py
 
-        # 1. Estadísticas de Estados (Para gráfico de torta)
-        stats = {
-            "pendientes": sum(1 for r in reclamos if r.estado.value == "pendiente"),
-            "en_proceso": sum(1 for r in reclamos if r.estado.value == "en_proceso"),
-            "resueltos": sum(1 for r in reclamos if r.estado.value == "resuelto"),
-            "total": len(reclamos)
-        }
-
-        # 2. Lógica de Nube de Palabras (Las 15 más frecuentes)
-        todo_el_texto = " ".join([r.contenido.lower() for r in reclamos])
-        # Limpieza: solo palabras de más de 3 letras que no estén en stopwords
-        palabras = [p.strip('.,;!?()') for p in todo_el_texto.split() 
-                    if len(p) > 3 and p not in self.stopwords]
+    def obtener_datos_dashboard(self, departamento_id=None):
+        from modules.reclamos import Reclamo
         
-        frecuencia = dict(Counter(palabras).most_common(15))
+        # Filtro de reclamos
+        if departamento_id:
+            query = Reclamo.query.filter_by(departamento_id=departamento_id).all()
+        else:
+            query = Reclamo.query.all()
 
+        # Lógica de estados para el gráfico
+        pendientes = len([r for r in query if r.estado == 'pendiente'])
+        resueltos = len([r for r in query if r.estado == 'resuelto'])
+
+        # Lógica para la Nube de Palabras
+        texto_total = " ".join([r.contenido.lower() for r in query])
+        palabras = [p for p in texto_total.split() if len(p) > 3] # Filtra palabras cortas
+        frecuencia = {}
+        for p in palabras:
+            frecuencia[p] = frecuencia.get(p, 0) + 1
+        
+        # IMPORTANTE: Retornar con la estructura exacta que pide el HTML
         return {
-            "stats": stats,
-            "frecuencia": frecuencia
+            "stats": {
+                "pendientes": pendientes,
+                "resueltos": resueltos
+            },
+            "frecuencia": dict(sorted(frecuencia.items(), key=lambda x: x[1], reverse=True)[:15])
         }
-
+        
     def generar_reporte_html(self, depto_id: str, stats: dict = None, frecuencia: dict = None) -> str:
         # Genera una versión HTML simplificada para impresión/reporte.
         datos = self.obtener_datos_dashboard(depto_id)

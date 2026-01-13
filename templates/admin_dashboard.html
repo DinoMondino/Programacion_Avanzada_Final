@@ -32,7 +32,7 @@
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">Distribución de Estados</h5>
                             <a href="{{ url_for('descargar_reporte') }}" class="btn btn-sm btn-outline-success">
-                                <i class="bi bi-file-earmark-pdf"></i> Generar Reporte
+                                <i class="bi bi-file-earmark-spreadsheet"></i> Descargar CSV
                             </a>
                         </div>
                         <div class="card-body text-center">
@@ -70,7 +70,7 @@
                             <tr>
                                 <th>ID</th>
                                 <th>Usuario</th>
-                                <th>Contenido</th>
+                                <th>Departamento</th> <th>Contenido</th>
                                 <th>Estado</th>
                                 <th>Acciones</th>
                             </tr>
@@ -79,44 +79,47 @@
                             {% for rec in reclamos_admin %}
                             <tr>
                                 <td><strong>#{{ rec.id }}</strong></td>
-                                <td>{{ rec.creador.nombre }} <br><small class="text-muted">{{ rec.creador.username }}</small></td>
+                                <td>{{ rec.autor.nombre if rec.autor else 'Sistema' }}</td>
                                 <td>
-                                    {{ rec.contenido[:70] }}...
-                                    {% if rec.adjunto_url %}
-                                    <br><a href="{{ url_for('static', filename='uploads/' + rec.adjunto_url) }}" target="_blank" class="badge bg-secondary text-decoration-none">Ver Foto</a>
-                                    {% endif %}
+                                    <span class="badge bg-light text-dark border">
+                                        {{ rec.departamento_id.replace('D_', '') if rec.departamento_id else 'GENERAL' }}
+                                    </span>
                                 </td>
+                                <td>{{ rec.contenido[:50] }}...</td>
+                                
                                 <td>
                                     <span class="badge {% if rec.estado == 'pendiente' %}bg-warning text-dark{% elif rec.estado == 'en_proceso' %}bg-info{% elif rec.estado == 'resuelto' %}bg-success{% else %}bg-danger{% endif %}">
                                         {{ rec.estado.upper() }}
                                     </span>
                                 </td>
-                                <td>
-                                    <form action="{{ url_for('actualizar_estado') }}" method="post" class="d-inline">
-                                        <input type="hidden" name="id_reclamo" value="{{ rec.id }}">
-                                        <select name="nuevo_estado" onchange="this.form.submit()" class="form-select form-select-sm d-inline-block w-auto">
-                                            <option value="" disabled selected>Cambiar Estado...</option>
-                                            <option value="en_proceso">En Proceso</option>
-                                            <option value="resuelto">Resuelto</option>
-                                            <option value="inválido">Inválido</option>
-                                        </select>
-                                    </form>
 
-                                    {% if current_user.rol_admin.value == "Secretario Técnico" %}
-                                    <form action="{{ url_for('derivar_reclamo') }}" method="post" class="d-inline ms-1">
-                                        <input type="hidden" name="id_reclamo" value="{{ rec.id }}">
-                                        <select name="nuevo_depto" onchange="this.form.submit()" class="form-select form-select-sm border-primary d-inline-block w-auto">
-                                            <option value="" disabled selected>Derivar a...</option>
-                                            <option value="D_INFRAESTRUCTURA">Infraestructura</option>
-                                            <option value="D_INFORMATICA">Informática</option>
-                                            <option value="D_SECRETARIA">Secretaría</option>
-                                        </select>
-                                    </form>
-                                    {% endif %}
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <form action="{{ url_for('actualizar_estado', id=rec.id) }}" method="post" class="d-inline">
+                                            <select name="nuevo_estado" onchange="this.form.submit()" class="form-select form-select-sm d-inline-block w-auto">
+                                                <option value="" disabled selected>Estado...</option>
+                                                <option value="pendiente">Pendiente</option>
+                                                <option value="en_proceso">En Proceso</option>
+                                                <option value="resuelto">Resuelto</option>
+                                            </select>
+                                        </form>
+
+                                        {% if current_user.rol_admin.value == "Secretario Técnico" %}
+                                        <form action="{{ url_for('derivar_reclamo') }}" method="post" class="d-inline ms-1">
+                                            <input type="hidden" name="id_reclamo" value="{{ rec.id }}">
+                                            <select name="nuevo_depto" onchange="this.form.submit()" class="form-select form-select-sm border-primary d-inline-block w-auto">
+                                                <option value="" disabled selected>Derivar...</option>
+                                                <option value="D_INFRAESTRUCTURA">Infraestructura</option>
+                                                <option value="D_INFORMATICA">Informática</option>
+                                                <option value="D_SECRETARIA">Secretaría</option>
+                                            </select>
+                                        </form>
+                                        {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="5" class="text-center py-4 text-muted">No hay reclamos registrados en este departamento.</td></tr>
+                            <tr><td colspan="6" class="text-center py-4 text-muted">No hay reclamos para mostrar.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -130,30 +133,11 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-info text-white">
-                <h5 class="modal-title" id="modalAyudaLabel"><i class="bi bi-info-circle"></i> Tutorial del Sistema de Gestión</h5>
+                <h5 class="modal-title" id="modalAyudaLabel"><i class="bi bi-info-circle"></i> Tutorial del Sistema</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
-                <div class="row">
-                    <div class="col-md-6 border-end">
-                        <h6>📈 Uso de Analítica</h6>
-                        <p class="small text-muted">El gráfico circular representa el estado de carga actual de su departamento. Puede identificar rápidamente cuántos casos están sin atender (Pendientes).</p>
-                        <h6>📂 Generación de Reportes</h6>
-                        <p class="small text-muted">Haga clic en "Generar Reporte" para obtener un documento HTML con la fecha actual y estadísticas consolidadas listas para imprimir.</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>🛠 Gestión de Reclamos</h6>
-                        <p class="small text-muted">En la pestaña "Gestión", puede cambiar el estado de un reclamo. Al marcarlo como <b>Resuelto</b>, se cierra el ciclo del reclamo.</p>
-                        {% if current_user.rol_admin.value == "Secretario Técnico" %}
-                        <div class="alert alert-warning p-2 small">
-                            <strong>Nota para Secretario:</strong> Usted puede derivar reclamos entre departamentos si el clasificador automático cometió un error.
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar Tutorial</button>
+                <p>"Panel de Gestión: Administre las peticiones de los usuarios y visualice las estadísticas clave de su área de forma rápida y sencilla
             </div>
         </div>
     </div>
@@ -163,17 +147,17 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('chartEstados').getContext('2d');
+        // Accedemos a data_analitica.stats según la estructura que definimos
         new Chart(ctx, {
             type: 'pie',
             data: {
-                labels: ['Pendientes', 'En Proceso', 'Resueltos'],
+                labels: ['Pendientes', 'Resueltos'],
                 datasets: [{
                     data: [
-                        {{ data_analitica.stats.pendientes }},
-                        {{ data_analitica.stats.en_proceso }},
-                        {{ data_analitica.stats.resueltos }}
+                        {{ data_analitica.stats.pendientes if data_analitica.stats else 0 }},
+                        {{ data_analitica.stats.resueltos if data_analitica.stats else 0 }}
                     ],
-                    backgroundColor: ['#ffc107', '#0dcaf0', '#198754'],
+                    backgroundColor: ['#ffc107', '#198754'],
                     borderWidth: 2,
                     borderColor: '#ffffff'
                 }]
@@ -181,9 +165,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' }
-                }
+                plugins: { legend: { position: 'bottom' } }
             }
         });
     });

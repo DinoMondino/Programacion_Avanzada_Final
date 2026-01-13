@@ -1,5 +1,8 @@
-from app import db
 from enum import Enum
+from flask_sqlalchemy import SQLAlchemy
+
+# Creamos una instancia local para definir los modelos sin depender de app.py
+db = SQLAlchemy()
 
 class Claustro(Enum):
     ESTUDIANTE = "Estudiante"
@@ -24,14 +27,14 @@ class Usuario(db.Model):
     rol_admin = db.Column(db.Enum(RolAdmin))
     departamento_id = db.Column(db.String(50), nullable=True)
 
+    reclamos_creados = db.relationship('Reclamo', backref='autor', lazy=True)
+
     # Polimorfismo: esta columna le dice a SQLAlchemy qué clase usar al leer de la DB
     tipo_usuario = db.Column(db.String(50)) 
     __mapper_args__ = {
         'polymorphic_identity': 'usuario',
         'polymorphic_on': tipo_usuario
     }
-
-    reclamos_creados = db.relationship('Reclamo', backref='creador', lazy=True)
 
 # --- CLASES DEL UML ---
 
@@ -50,7 +53,16 @@ class SecretarioTecnico(Usuario):
     """Corresponde al Secretario en el UML"""
     __mapper_args__ = { 'polymorphic_identity': 'secretario' }
     def __init__(self, **kwargs):
-        super().__init__(rol_admin=RolAdmin.SECRETARIO, departamento_id="ALL", **kwargs)
+        # Quitamos 'rol_admin' de kwargs si viniera de afuera para evitar el error
+        kwargs.pop('rol_admin', None) 
+        kwargs.pop('departamento_id', None)
+        
+        # Ahora llamamos al padre pasando los valores fijos
+        super().__init__(
+            rol_admin=RolAdmin.SECRETARIO, 
+            departamento_id="ADMIN_GENERAL", 
+            **kwargs
+        )
 
     def listar_reclamos_pendientes_admin(self):
         # El secretario ve todos los reclamos en la DB

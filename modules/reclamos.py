@@ -1,10 +1,10 @@
-from app import db
 from datetime import datetime
+from .usuarios import db
 from enum import Enum
 from typing import List, Dict, Any
 
 
-adherentes = db.Table('adherentes',
+adhesiones = db.Table('adhesiones',
     db.Column('usuario_id', db.Integer, db.ForeignKey('usuarios.id'), primary_key=True),
     db.Column('reclamo_id', db.Integer, db.ForeignKey('reclamos.id'), primary_key=True)
 )
@@ -26,7 +26,7 @@ class Reclamo(db.Model):
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
     
     # Usuarios que apoyan este reclamo
-    apoyos = db.relationship('Usuario', secondary=adherentes, backref='reclamos_apoyados')
+    seguidores = db.relationship('Usuario', secondary=adhesiones, backref='reclamos_apoyados')
 
     def get_num_adherentes(self) -> int:
         return len(self.apoyos)

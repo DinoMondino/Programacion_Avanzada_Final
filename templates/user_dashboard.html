@@ -25,14 +25,14 @@
                 <div class="card-body">
                     <form action="{{ url_for('crear_reclamo') }}" method="post" enctype="multipart/form-data">
                         <div class="mb-3">
-                            <label class="form-label">Descripción del Problema</label>
-                            <textarea name="contenido" class="form-control" rows="4" required placeholder="Describe detalladamente el problema..."></textarea>
+                            <label class="form-label font-weight-bold">Descripción del Problema</label>
+                            <textarea name="contenido" class="form-control" rows="4" required placeholder="Describe detalladamente el problema (ej: goteras, falta de tizas, falla de wifi...)"></textarea>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Adjuntar Foto (Opcional)</label>
                             <input type="file" name="foto" class="form-control" accept="image/*">
                         </div>
-                        <button type="submit" class="btn btn-primary w-100">Enviar Reclamo</button>
+                        <button type="submit" class="btn btn-primary w-100 shadow-sm">Enviar Reclamo</button>
                     </form>
                 </div>
             </div>
@@ -40,27 +40,39 @@
 
         <div class="tab-pane fade" id="mis-reclamos">
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover align-middle">
                     <thead class="table-dark">
                         <tr>
                             <th>ID</th>
                             <th>Fecha</th>
                             <th>Estado</th>
                             <th>Contenido</th>
-                            <th>Foto</th>
+                            <th class="text-center">Foto</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for r in current_user.ver_mis_reclamos() %}
                         <tr>
-                            <td>{{ r.id }}</td>
-                            <td>{{ r.fecha_creacion.strftime('%d/%m/%y') }}</td>
-                            <td><span class="badge bg-info">{{ r.estado.value }}</span></td>
-                            <td>{{ r.contenido[:50] }}...</td>
+                            <td><strong>#{{ r.id }}</strong></td>
+                            <td>{{ r.fecha_creacion.strftime('%d/%m/%y') if r.fecha_creacion else '-' }}</td>
                             <td>
+                                {% if r.estado == 'pendiente' %}
+                                    <span class="badge bg-warning text-dark">Pendiente</span>
+                                {% elif r.estado == 'resuelto' %}
+                                    <span class="badge bg-success">Resuelto</span>
+                                {% else %}
+                                    <span class="badge bg-info">{{ r.estado }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ r.contenido[:60] }}{% if r.contenido|length > 60 %}...{% endif %}</td>
+                            <td class="text-center">
                                 {% if r.adjunto_url %}
-                                <a href="{{ url_for('static', filename='uploads/' + r.adjunto_url) }}" target="_blank">Ver Foto</a>
-                                {% else %} - {% endif %}
+                                <a href="{{ url_for('static', filename='uploads/' + r.adjunto_url) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                    🖼️ Ver
+                                </a>
+                                {% else %}
+                                <span class="text-muted small">Sin foto</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -70,19 +82,32 @@
         </div>
 
         <div class="tab-pane fade" id="listar-todos">
-            <div class="list-group">
-                {% for r_id, r in all_reclamos.items() %}
-                <div class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>{{ r.id }}</strong> | <small>{{ r.departamento_id }}</small>
-                        <p class="mb-0">{{ r.contenido }}</p>
-                        <small class="text-muted">Apoyos: {{ r.adherentes_ids|length }}</small>
+            <div class="row">
+                {% for r in all_reclamos %}
+                <div class="col-md-12 mb-3">
+                    <div class="card shadow-sm border-start border-primary border-4">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-primary mb-1">
+                                    Reclamo #{{ r.id }} | <span class="badge bg-light text-dark border">{{ r.departamento_id }}</span>
+                                </h6>
+                                <p class="mb-2 text-dark">{{ r.contenido }}</p>
+                                <div class="text-muted small">
+                                    <i class="bi bi-people"></i> Apoyos actuales: <strong>{{ r.seguidores|length if r.seguidores else 0 }}</strong>
+                                </div>
+                            </div>
+                            
+                            {% if r.usuario_id != current_user.id %}
+                            <form action="{{ url_for('adherirse', id_reclamo=r.id) }}" method="post">
+                                <button class="btn btn-sm btn-success">
+                                    <i class="bi bi-hand-thumbs-up"></i> +1 Apoyar
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="badge bg-secondary">Tu Reclamo</span>
+                            {% endif %}
+                        </div>
                     </div>
-                    {% if r.usuario_creator_id != current_user.id %}
-                    <form action="{{ url_for('adherirse', id_reclamo=r.id) }}" method="post">
-                        <button class="btn btn-sm btn-outline-success">+1 Apoyar</button>
-                    </form>
-                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
