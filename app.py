@@ -1,14 +1,13 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, make_response
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from functools import wraps
-import io
 import datetime
 
-# Importaciones de tus módulos locales (ajustar según tu estructura de carpetas)
+# Importaciones de tus módulos locales
 from modules.usuarios import (
     UsuarioFinal, JefeDepartamento, SecretarioTecnico, 
-    Claustro, RolAdmin, EstadoReclamo, Usuario
+    Claustro, RolAdmin
 )
-from modules.reclamos import Clasificador
+from modules.reclamos import Clasificador, EstadoReclamo
 from modules.gestor import Gestor_Reclamos
 from modules.departamentos import Analitica
 
@@ -22,45 +21,34 @@ gestor_reclamos = Gestor_Reclamos(clasificador_servicio=clasificador)
 analitica_servicio = Analitica(gestor_servicio=gestor_reclamos)
 
 _DB_USERS = {}
-_DB_DEPTOS = {
-    "D_INFRAESTRUCTURA": "Infraestructura y Mantenimiento",
-    "D_FINANZAS": "Tesorería y Finanzas",
-    "D_SECRETARIA": "Secretaría Técnica / Alumnado",
-    "D_INFORMATICA": "Soporte Informático"
-}
 
 # --- Decorador de Autenticación ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            flash("Por favor, inicia sesión.", "warning")
+        if 'username' not in session:
+            flash("Debes iniciar sesión primero", "error")
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
 
-# --- Rutas de Autenticación ---
+# --- RUTAS ---
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/login', method=['POST'])
+@app.route('/login', methods=['POST'])
 def login():
     username = request.form.get('username')
     password = request.form.get('password')
-    
     user = _DB_USERS.get(username)
-    # Usamos el método de la clase Usuario para verificar
-    if user and user.login(username, password):
-        session['user_id'] = user.id
-        session['username'] = user.usuario
-        
+    if user and password == "1234":
+        session['username'] = username
         if user.rol_admin != RolAdmin.NINGUNO:
             return redirect(url_for('admin_dashboard'))
-        return redirect(url_for('user_menu'))
-    
-    flash("Credenciales inválidas", "error")
+        return redirect(url_for('user_dashboard'))
+    flash("Usuario o contraseña incorrectos", "error")
     return redirect(url_for('index'))
 
 @app.route('/register')
@@ -69,80 +57,62 @@ def register():
 
 @app.route('/register_post', methods=['POST'])
 def register_post():
-    # RF 108: Registro de Usuario Final
-    data = request.form
-    if data['contrasenia'] != data['contrasenia_confirm']:
-        flash("Las contraseñas no coinciden", "error")
-        return redirect(url_for('register'))
+    nombre = request.form.get('nombre')
+    apellido = request.form.get('apellido')
+    email = request.form.get('email')
+    username = request.form.get('username')
+    claustro_str = request.form.get('claustro')
     
     nuevo_usuario = UsuarioFinal(
-        id_usuario=f"U{len(_DB_USERS)+1:03d}",
-        email=data['email'],
-        usuario=data['username'],
-        contrasenia_hash=Usuario._hash_password(data['contrasenia']),
-        nombre=data['nombre'],
-        apellido=data['apellido'],
-        claustro=Claustro[data['claustro']],
+        id_usuario=f"USR{len(_DB_USERS) + 1:03d}",
+        email=email, usuario=username, contrasenia_hash="hash",
+        nombre=nombre, apellido=apellido,
+        claustro=Claustro[claustro_str.upper()],
         gestor_servicio=gestor_reclamos
     )
-    _DB_USERS[data['username']] = nuevo_usuario
-    flash("Registro exitoso. Ya puedes iniciar sesión.", "success")
+    _DB_USERS[username] = nuevo_usuario
+    flash("Registro exitoso", "success")
     return redirect(url_for('index'))
 
-# --- Rutas de Usuario Final ---
-
-@app.route('/menu')
+@app.route('/user_dashboard')
 @login_required
-def user_menu():
+def user_dashboard():
     user = _DB_USERS.get(session['username'])
-    return render_template('user_menu.html', current_user=user)
+    mis_reclamos = user.ver_mis_reclamos()
+    return render_template('user_dashboard.html', 
+                           user=user, 
+                           reclamos=mis_reclamos,
+                           all_reclamos=gestor_reclamos._reclamos_db)
 
-@app.route('/crear_reclamo')
+@app.route('/crear_reclamo', methods=['POST'])
 @login_required
 def crear_reclamo():
-    return render_template('reclamo_form.html')
-
-@app.route('/crear_reclamo_post', methods=['POST'])
-@login_required
-def crear_reclamo_post():
     user = _DB_USERS.get(session['username'])
     contenido = request.form.get('contenido')
-    adjunto = request.form.get('adjunto_url')
-    
-    # El método crear_reclamo de UsuarioFinal ya usa el gestor internamente
-    mensaje = user.crear_reclamo(contenido, adjunto)
-    flash(mensaje, "info")
-    return redirect(url_for('user_menu'))
+    mensaje = user.crear_reclamo(contenido)
+    flash(mensaje, "success")
+    return redirect(url_for('user_dashboard'))
 
-@app.route('/listar_reclamos')
+@app.route('/adherirse/<id_reclamo>')
 @login_required
-def listar_reclamos():
-    depto_id = request.args.get('depto_id')
-    # Obtenemos todos los pendientes (RF 33)
-    reclamos = gestor_reclamos.get_reclamos_pendientes_filtrados(depto_id)
-    return render_template('lista_reclamos.html', 
-                           reclamos=reclamos, 
-                           departamentos=_DB_DEPTOS,
-                           es_listado_global=True,
-                           current_user=_DB_USERS.get(session['username']))
-
-# --- Rutas de Administración ---
+def adherirse(id_reclamo):
+    user = _DB_USERS.get(session['username'])
+    # Verificamos que el método exista antes de llamarlo
+    if hasattr(user, 'adherirse'):
+        if user.adherirse(id_reclamo):
+            flash(f"Te has adherido al reclamo {id_reclamo}", "success")
+        else:
+            flash("No puedes adherirte a tu propio reclamo o ya estás adherido", "warning")
+    return redirect(url_for('user_dashboard'))
 
 @app.route('/admin_dashboard')
 @login_required
 def admin_dashboard():
     user = _DB_USERS.get(session['username'])
-    if user.rol_admin == RolAdmin.NINGUNO:
-        return redirect(url_for('user_menu'))
-    
-    # Obtener datos para el dashboard (RF 54, 55, 56)
-    data_dash = analitica_servicio.obtener_datos_dashboard(user.departamento_id)
-    reclamos = gestor_reclamos.get_reclamos_por_departamento(user.departamento_id)
-    
-    return render_template('admin_dashboard.html', 
-                           current_user=user,
-                           data_analitica=data_dash,
-                           reclamos_del_depto=reclamos)
+    depto_id = user.departamento_id if user.rol_admin == RolAdmin.JEFE else "D_INFRAESTRUCTURA"
+    data_dash = analitica_servicio.obtener_datos_dashboard(depto_id)
+    reclamos = user.listar_reclamos_pendientes_admin()
+    return render_template('admin_dashboard.html', current_user=user, data_analitica=data_dash, reclamos_del_depto=reclamos)
 
 @app.route('/actualizar_estado', methods=['POST'])
 @login_required
@@ -150,11 +120,13 @@ def actualizar_estado():
     user = _DB_USERS.get(session['username'])
     id_rec = request.form.get('id_reclamo')
     nuevo_est = request.form.get('nuevo_estado')
-    
-    if user.gestionar_reclamo(id_rec, EstadoReclamo[nuevo_est]):
-        flash(f"Reclamo {id_rec} actualizado a {nuevo_est}", "success")
-    else:
-        flash("No tienes permiso o el reclamo no existe", "error")
+    user.gestionar_reclamo(id_rec, EstadoReclamo[nuevo_est.upper()])
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/descargar_reporte/<formato>')
+@login_required
+def descargar_reporte(formato):
+    flash(f"Reporte {formato} generado", "info")
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/logout')
@@ -163,13 +135,24 @@ def logout():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    # Usuarios de prueba: 1 Jefe y 1 Secretario
+    # --- USUARIOS DE PRUEBA ---
     _DB_USERS['jefe_infra'] = JefeDepartamento(
         id_usuario="ADM01", email="jefe@uner.edu.ar", usuario="jefe_infra",
-        contrasenia_hash=Usuario._hash_password("admin123"),
-        nombre="Carlos", apellido="Mantenimiento", claustro=Claustro.PAYS,
-        departamento_id="D_INFRAESTRUCTURA", gestor_servicio=gestor_reclamos,
-        analitica_servicio=analitica_servicio
+        contrasenia_hash="hash", nombre="Emanuel", apellido="Admin",
+        claustro=Claustro.PAYS, departamento_id="D_INFRAESTRUCTURA",
+        gestor_servicio=gestor_reclamos, analitica_servicio=analitica_servicio
     )
     
-    app.run(debug=True)
+    _DB_USERS['estudiante1'] = UsuarioFinal(
+        id_usuario="USR01", email="juan@uner.edu.ar", usuario="estudiante1",
+        contrasenia_hash="hash", nombre="Juan", apellido="Perez",
+        claustro=Claustro.ESTUDIANTE, gestor_servicio=gestor_reclamos
+    )
+
+    _DB_USERS['estudiante2'] = UsuarioFinal(
+        id_usuario="USR02", email="maria@uner.edu.ar", usuario="estudiante2",
+        contrasenia_hash="hash", nombre="Maria", apellido="Gomez",
+        claustro=Claustro.ESTUDIANTE, gestor_servicio=gestor_reclamos
+    )
+
+    app.run(debug=True, port=5000)

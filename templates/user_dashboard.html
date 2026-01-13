@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Nuevo Reclamo</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('crear_reclamo') }}" method="post">
+                        <div class="mb-3">
+                            <label class="form-label">¿Qué problema detectaste?</label>
+                            <textarea name="contenido" class="form-control" rows="4" placeholder="Ej: No funciona el Wi-Fi en el pabellón B..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Enviar Reclamo</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Mis Reclamos Enviados</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Contenido</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rec in reclamos %}
+                            <tr>
+                                <td><span class="badge bg-secondary">{{ rec.id }}</span></td>
+                                <td>{{ rec.contenido[:50] }}...</td>
+                                <td>
+                                    <span class="badge {% if rec.estado.value == 'resuelto' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                        {{ rec.estado.value }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" class="text-center text-muted">Aún no has creado reclamos.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Reclamos de la Comunidad</h5>
+                    <small>Súmate a reclamos existentes para darles prioridad</small>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for rec_id, rec_obj in all_reclamos.items() if rec_obj.usuario_creator_id != user.id %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ rec_obj.id }}</strong>: {{ rec_obj.contenido[:60] }}...
+                            <br><small class="text-muted">Apoyos actuales: {{ rec_obj.adherentes_ids|length }}</small>
+                        </div>
+                        <a href="{{ url_for('adherirse', id_reclamo=rec_obj.id) }}" class="btn btn-sm btn-outline-primary">
+                            +1 Adherirse
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

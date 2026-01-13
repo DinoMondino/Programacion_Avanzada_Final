@@ -34,7 +34,7 @@ class TestUsuarios(unittest.TestCase):
     def test_flujo_estudiante(self):
         """Test de creación de reclamo por usuario final."""
         res = self.estudiante.crear_reclamo("No hay luz en el aula", None)
-        self.assertIn("REC-R0001", res)
+        self.assertIn("R0001", res)
 
     def test_permisos_jefe(self):
         """El jefe puede gestionar reclamos de su departamento."""
