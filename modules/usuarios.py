@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Optional
 from abc import ABC
-from .reclamos import EstadoReclamo, Reclamo
+from modules.reclamos import EstadoReclamo, Reclamo
 
 class Claustro(Enum):
     ESTUDIANTE = "Estudiante"
@@ -29,13 +29,14 @@ class UsuarioFinal(Usuario):
     """ Usuario común que registra, crea y adhiere a reclamos."""
     
     def crear_reclamo(self, contenido: str, adjunto_url: Optional[str] = None) -> str:
-        # Flujo de creación que detecta reclamos similares.
         res = self._gestor_reclamos.crear_reclamo(contenido, adjunto_url, self.id)
-        
-        if res["status"] == "similar_encontrado":
-            return f"Similares detectados: {res['similares']}. ¿Desea adherirse?"
-        return f"Éxito: {res['mensaje']} (ID: {res.get('id_reclamo')})"
+    
+        if res.get('status') == 'similar_encontrado':
+          # Cambiamos 'similares' por 'adherido_a' que es lo que devuelve tu gestor
+            id_similar = res.get('adherido_a')
+            return f"Se encontró un reclamo similar ({id_similar}). Se recomienda adherirse."
 
+        return res.get('mensaje', 'Reclamo procesado')
     def adherirse(self, reclamo_id: str) -> bool:
         """Permite al usuario sumarse a un reclamo existente."""
         return self._gestor_reclamos.adherirse_a_reclamo(reclamo_id, self.id)
@@ -66,5 +67,9 @@ class SecretarioTecnico(Usuario):
         # El secretario ve todos los reclamos en la DB
         return list(self._gestor_reclamos._reclamos_db.values())
     
+    def gestionar_reclamo(self, reclamo_id, nuevo_estado):
+        """Permite al Secretario cambiar el estado de cualquier reclamo."""
+        return self._gestor_reclamos.gestionar_reclamo(reclamo_id, nuevo_estado)
+
     def derivar_reclamo(self, reclamo_id, nuevo_depto):
         return self._gestor_reclamos.derivar_reclamo(reclamo_id, nuevo_depto)

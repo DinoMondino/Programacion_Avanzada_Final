@@ -3,7 +3,7 @@ import datetime
 from typing import List, Dict, Any, Optional
 
 class EstadoReclamo(Enum):
-    INVALIDO = "inválido"
+    INVÁLIDO = "inválido"
     PENDIENTE = "pendiente"
     EN_PROCESO = "en_proceso"
     RESUELTO = "resuelto"

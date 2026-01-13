@@ -150,11 +150,24 @@ def derivar_reclamo():
             flash(f"Reclamo {id_rec} derivado a {nuevo_depto}", "success")
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/descargar_reporte/<formato>')
+@app.route('/descargar_reporte')
 @login_required
-def descargar_reporte(formato):
-    flash(f"Reporte {formato} generado", "info")
-    return redirect(url_for('admin_dashboard'))
+def descargar_reporte():
+    user = _DB_USERS.get(session['username'])
+    if user.rol_admin == RolAdmin.NINGUNO:
+        return redirect(url_for('index'))
+    
+    depto_id = user.departamento_id if user.rol_admin == RolAdmin.JEFE else None
+    # Genera el reporte HTML real
+    html_content = analitica_servicio.generar_reporte_html(depto_id)
+    
+    # lo devolvemos como un archivo HTML descargable
+    from flask import Response
+    return Response(
+        html_content,
+        mimetype="text/html",
+        headers={"Content-disposition": "attachment; filename=reporte_gestion.html"}
+    )
 
 @app.route('/logout')
 def logout():
