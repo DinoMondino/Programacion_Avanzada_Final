@@ -66,3 +66,5 @@ class TestClasificador(unittest.TestCase):
 
 # Generar la carpeta con el reporte visual (HTML)
 # python -m coverage html
+
+# python -m coverage erase
