@@ -1,6 +1,13 @@
+from app import db
+from datetime import datetime
 from enum import Enum
-import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
+
+
+adherentes = db.Table('adherentes',
+    db.Column('usuario_id', db.Integer, db.ForeignKey('usuarios.id'), primary_key=True),
+    db.Column('reclamo_id', db.Integer, db.ForeignKey('reclamos.id'), primary_key=True)
+)
 
 class EstadoReclamo(Enum):
     INVÁLIDO = "inválido"
@@ -8,26 +15,21 @@ class EstadoReclamo(Enum):
     EN_PROCESO = "en_proceso"
     RESUELTO = "resuelto"
 
-class Reclamo:
-    def __init__(self, id_reclamo: str, contenido: str, usuario_creator_id: str, 
-                 departamento_id: str, estado: EstadoReclamo, 
-                 palabras_clave: Optional[List[str]] = None, 
-                 adjunto_url: Optional[str] = None, 
-                 fecha_creacion: Optional[datetime.datetime] = None, 
-                 adherentes_ids: Optional[List[str]] = None):
-        self.id = id_reclamo
-        self.contenido = contenido
-        self.usuario_creator_id = usuario_creator_id
-        self.departamento_id = departamento_id
-        self.estado = estado
-        self.palabras_clave = palabras_clave or []
-        self.adjunto_url = adjunto_url
-        # [CAMBIO] Se asegura que siempre haya un timestamp de creación
-        self.fecha_creacion = fecha_creacion or datetime.datetime.now()
-        self.adherentes_ids = adherentes_ids or []
+class Reclamo(db.Model):
+    __tablename__ = 'reclamos'
+    id = db.Column(db.Integer, primary_key=True)
+    contenido = db.Column(db.Text, nullable=False)
+    estado = db.Column(db.String(20), default="pendiente")
+    departamento_id = db.Column(db.String(50))
+    adjunto_url = db.Column(db.String(200))
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
+    
+    # Usuarios que apoyan este reclamo
+    apoyos = db.relationship('Usuario', secondary=adherentes, backref='reclamos_apoyados')
 
     def get_num_adherentes(self) -> int:
-        return len(self.adherentes_ids)
+        return len(self.apoyos)
 
     def __repr__(self):
         return f"<Reclamo {self.id} - {self.estado.value}>"

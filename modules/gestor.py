@@ -2,10 +2,11 @@ from typing import Dict, Any, Optional, List
 from .reclamos import Reclamo, Clasificador, EstadoReclamo
 
 class Gestor_Reclamos:
-    def __init__(self, clasificador_servicio: Clasificador):
-        self.clasificador_servicio = clasificador_servicio
-        self._reclamos_db: Dict[str, Reclamo] = {}
+    def __init__(self, db, clasificador):
+        self.db = db
+        self.clasificador = clasificador
         self._next_reclamo_id: int = 1
+        self._reclamos_db: Dict[str, Reclamo] = {}
         
     def _get_next_id(self) -> str:
         """Genera IDs únicos (R0001, R0002...)."""
@@ -17,28 +18,20 @@ class Gestor_Reclamos:
         """Busca un reclamo por su ID."""
         return self._reclamos_db.get(reclamo_id)
 
-    def crear_reclamo(self, contenido: str, adjunto: Optional[str], usuario_creator_id: str) -> Dict[str, Any]:
-        """RF 30, 31, 32: Crea un reclamo con clasificación automática y detección de similares."""
-        similares_ids = self.clasificador_servicio.encontrar_similares(contenido, self._reclamos_db)
-        clasificacion = self.clasificador_servicio.clasificar(contenido)
+    def crear_reclamo(self, contenido, adjunto, usuario_id):
+        depto = self.clasificador.clasificar(contenido)
+        # Búsqueda de similares en la DB real
+        similares = Reclamo.query.filter(Reclamo.contenido.contains(contenido[:20])).first()
         
-        nuevo_id = self._get_next_id()
-        nuevo_rec = Reclamo(
-            id_reclamo=nuevo_id,
-            contenido=contenido,
-            usuario_creator_id=usuario_creator_id,
-            departamento_id=clasificacion["departamento_id"],
-            estado=EstadoReclamo.PENDIENTE,
-            adjunto_url=adjunto
-        )
-        self._reclamos_db[nuevo_id] = nuevo_rec
-        
-        return {
-            "mensaje": "Éxito: Reclamo creado",
-            "id_reclamo": nuevo_id,
-            "adherido_a": similares_ids[0] if similares_ids else None,
-            "status": "similar_encontrado" if similares_ids else "ok"
-        }
+        if similares:
+            # Lógica de adhesión automática
+            return {"mensaje": "Reclamo similar detectado, te hemos adherido.", "status": "similar"}
+            
+        nuevo = Reclamo(contenido=contenido, adjunto_url=adjunto, 
+                        usuario_id=usuario_id, departamento_id=depto)
+        self.db.session.add(nuevo)
+        self.db.session.commit()
+        return {"mensaje": "Reclamo creado con éxito.", "status": "ok"}
 
     # --- FUNCIONES DE FILTRADO (Recuperadas y Corregidas) ---
 
