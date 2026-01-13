@@ -25,7 +25,7 @@ Gestión de Fotos: En la opción "crear reclamo", debes proveer la funcionalidad
 
 Opciones de Menú: El enunciado especifica que el menú del usuario final debe tener explícitamente las opciones: "crear reclamo", "listar reclamos" y "mis reclamos". Asegúrate de que tu plantilla user_dashboard.html refleje estas tres secciones claramente.
 
-"
+"hecho"
 
 4. Requerimientos No Funcionales y Técnicos (Críticos)
 Persistencia en Base de Datos Relacional: Este es un punto donde el proyecto actual falla. El enunciado exige explícitamente que los datos se almacenen de forma persistente y en una base de datos relacional (como SQLite o PostgreSQL). El uso de diccionarios en memoria (_DB_USERS, _reclamos_db) no cumple con esta consigna.

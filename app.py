@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from functools import wraps
+import os
 import datetime
-
+from werkzeug.utils import secure_filename
 # Importaciones de tus módulos locales
 from modules.usuarios import (
     UsuarioFinal, JefeDepartamento, SecretarioTecnico, 
@@ -13,6 +14,15 @@ from modules.departamentos import Analitica
 
 app = Flask(__name__)
 app.secret_key = 'super_secreto_uner' 
+
+# Configuración para subida de archivos
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # --- Inicialización de Servicios ---
 STOPWORDS = ["el", "la", "los", "las", "un", "una", "y", "o", "de", "a", "en", "es", "para", "que"]
@@ -77,11 +87,12 @@ def register_post():
 @app.route('/user_dashboard')
 @login_required
 def user_dashboard():
+    # 1. Obtenemos el objeto usuario desde nuestra "DB" usando la sesión
     user = _DB_USERS.get(session['username'])
-    mis_reclamos = user.ver_mis_reclamos()
+    
+    # 2. Pasamos el objeto al template
     return render_template('user_dashboard.html', 
-                           user=user, 
-                           reclamos=mis_reclamos,
+                           current_user=user, 
                            all_reclamos=gestor_reclamos._reclamos_db)
 
 @app.route('/crear_reclamo', methods=['POST'])
@@ -89,20 +100,29 @@ def user_dashboard():
 def crear_reclamo():
     user = _DB_USERS.get(session['username'])
     contenido = request.form.get('contenido')
-    mensaje = user.crear_reclamo(contenido)
-    flash(mensaje, "success")
+    file = request.files.get('foto')
+    
+    adjunto_url = None
+    if file and allowed_file(file.filename):
+        filename = secure_filename(f"{datetime.datetime.now().timestamp()}_{file.filename}")
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        adjunto_url = filename
+
+    mensaje = user.crear_reclamo(contenido, adjunto_url)
+    flash(mensaje, "info")
     return redirect(url_for('user_dashboard'))
 
-@app.route('/adherirse/<id_reclamo>')
+@app.route('/adherirse/<id_reclamo>', methods=['POST'])
 @login_required
-def adherirse(id_reclamo):
+def adherirse(id_reclamo): # Aquí recibe el ID directamente de la URL
     user = _DB_USERS.get(session['username'])
-    # Verificamos que el método exista antes de llamarlo
-    if hasattr(user, 'adherirse'):
-        if user.adherirse(id_reclamo):
-            flash(f"Te has adherido al reclamo {id_reclamo}", "success")
-        else:
-            flash("No puedes adherirte a tu propio reclamo o ya estás adherido", "warning")
+    
+    # Llamamos al método del gestor
+    if gestor_reclamos.adherirse_a_reclamo(id_reclamo, user.id):
+        flash(f"Te has adherido al reclamo {id_reclamo}", "success")
+    else:
+        flash("No se pudo realizar la adhesión", "error")
+        
     return redirect(url_for('user_dashboard'))
 
 @app.route('/admin_dashboard')
@@ -135,7 +155,14 @@ def actualizar_estado():
     user = _DB_USERS.get(session['username'])
     id_rec = request.form.get('id_reclamo')
     nuevo_est = request.form.get('nuevo_estado')
-    user.gestionar_reclamo(id_rec, EstadoReclamo[nuevo_est.upper()])
+    if id_rec and nuevo_est:
+        try:
+            # Corrección: Buscar por valor para evitar problemas de tildes/KeyError
+            estado_enum = EstadoReclamo(nuevo_est.lower())
+            user.gestionar_reclamo(id_rec, estado_enum)
+            flash(f"Reclamo {id_rec} actualizado", "success")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "danger")
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/derivar_reclamo', methods=['POST'])
