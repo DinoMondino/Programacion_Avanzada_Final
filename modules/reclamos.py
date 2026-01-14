@@ -29,7 +29,7 @@ class Reclamo(db.Model):
     seguidores = db.relationship('Usuario', secondary=adhesiones, backref='reclamos_apoyados')
 
     def get_num_adherentes(self) -> int:
-        return len(self.apoyos)
+        return len(self.seguidores)
 
     def __repr__(self):
         return f"<Reclamo {self.id} - {self.estado.value}>"
@@ -40,7 +40,7 @@ class Clasificador:
         self.stopwords = stopwords
         self.keywords_por_depto = {
             "D_INFRAESTRUCTURA": ["luz", "agua", "techo", "baño", "edificio", "puerta", "ventana"],
-            "D_INFORMATICA": ["wifi", "internet", "computadora", "servidor", "red", "sistema", "software"],
+            "D_INFORMATICA": ["wifi", "internet", "computadora", "servidor", "red", "sistema", "software", "programación"],
             "D_SECRETARIA": ["inscripcion", "examen", "final", "certificado", "alumno", "nota", "acta"]
         }
 
