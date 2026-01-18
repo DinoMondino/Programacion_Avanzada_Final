@@ -269,7 +269,6 @@ def setup():
     from modules.usuarios import Usuario, SecretarioTecnico, JefeDepartamento, RolAdmin
     
     if not Usuario.query.filter_by(username='secretario').first():
-        # Ya no pasamos rol_admin porque el __init__ lo pone solo
         admin = SecretarioTecnico(
             username='secretario', 
             password='1234',
