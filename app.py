@@ -263,29 +263,25 @@ def derivar_reclamo():
     return redirect(url_for('admin_dashboard'))
 
 # --- 6. INICIALIZACIÓN ---
-@app.before_request
-def setup():
-    db.create_all()
-    from modules.usuarios import Usuario, SecretarioTecnico, JefeDepartamento, RolAdmin
-    
-    if not Usuario.query.filter_by(username='secretario').first():
-        admin = SecretarioTecnico(
-            username='secretario', 
-            password='1234',
-            nombre='Admin'
-        )
-        db.session.add(admin)
+def inicializar_base_de_datos():
+    with app.app_context():
+        db.create_all()
+        from modules.usuarios import Usuario, SecretarioTecnico, JefeDepartamento
+        
+        # Solo creamos si no existen para no duplicar ni causar errores
+        if not Usuario.query.filter_by(username='secretario').first():
+            admin = SecretarioTecnico(username='secretario', password='1234', nombre='Admin')
+            db.session.add(admin)
 
-    if not Usuario.query.filter_by(username='jefe_infra').first():
-        jefe = JefeDepartamento(
-            username='jefe_infra', 
-            password='1234', 
-            nombre='Roberto',
-            departamento_id='D_INFRAESTRUCTURA' 
-        )
-        db.session.add(jefe)
+        if not Usuario.query.filter_by(username='jefe_infra').first():
+            jefe = JefeDepartamento(username='jefe_infra', password='1234', nombre='Roberto', departamento_id='D_INFRAESTRUCTURA')
+            db.session.add(jefe)
 
-    db.session.commit()
+        db.session.commit()
 
 if __name__ == '__main__':
+    inicializar_base_de_datos() # Llamada única al iniciar
     app.run(debug=True)
+    
+# agregarle nombre al dashboard de jefe departamento
+# revisar base de datos
