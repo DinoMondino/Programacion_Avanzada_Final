@@ -127,26 +127,53 @@ def user_dashboard():
 @login_required
 def crear_reclamo():
     from modules.usuarios import Usuario
+    from modules.reclamos import Reclamo, Clasificador
     from modules.gestor import Gestor_Reclamos
-    from modules.reclamos import Clasificador
     
     user = Usuario.query.get(session['user_id'])
     contenido = request.form.get('contenido')
+    
+    # --- ESTA ES LA LÍNEA QUE FALTA ---
+    # Obtenemos el valor del campo 'confirmado' que enviamos desde el HTML
+    confirmado = request.form.get('confirmado') == 'true'
+    
     file = request.files.get('foto')
     
+    # Manejo de archivos
     adjunto_url = None
     if file and file.filename != '':
+        from werkzeug.utils import secure_filename
+        import datetime
         filename = secure_filename(f"{datetime.datetime.now().timestamp()}_{file.filename}")
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         adjunto_url = filename
 
-    # Inicializamos el gestor dentro de la ruta
+    # Lógica de detección de similares
+    if not confirmado:
+        palabras = [p for p in contenido.split() if len(p) > 3]
+        similares = []
+        if palabras:
+            # Buscamos en la DB reclamos similares
+            similares = Reclamo.query.filter(
+                Reclamo.estado == 'pendiente'
+            ).filter(
+                db.or_(*[Reclamo.contenido.like(f"%{p}%") for p in palabras[:3]])
+            ).limit(3).all()
+
+        if similares:
+            # IMPORTANTE: Pasamos todos los datos para que el dashboard cargue bien
+            return render_template('user_dashboard.html', 
+                                   current_user=user, 
+                                   all_reclamos=Reclamo.query.all(),
+                                   reclamos_similares=similares,
+                                   contenido_pendiente=contenido)
+
+    # Si llegó aquí es porque no hay similares o el usuario ya confirmó
     gestor_serv = Gestor_Reclamos(db, Clasificador(stopwords=[]))
     resultado = gestor_serv.crear_reclamo(contenido, adjunto_url, user.id)
     
-    flash(resultado['mensaje'], "success" if resultado['status'] == 'ok' else "info")
+    flash(resultado['mensaje'], "success")
     return redirect(url_for('user_dashboard'))
-
 @app.route('/adherirse/<int:id_reclamo>', methods=['POST'])
 @login_required
 def adherirse(id_reclamo):
