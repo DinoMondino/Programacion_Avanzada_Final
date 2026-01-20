@@ -7,7 +7,10 @@
             <button type="button" class="btn btn-info btn-sm me-3 shadow-sm text-white" data-bs-toggle="modal" data-bs-target="#modalAyuda">
                 <i class="bi bi-question-circle"></i> Ayuda
             </button>
-            <h1 class="mb-0">Dashboard: {{ current_user.rol_admin.value }}</h1>
+            <h1 class="mb-0">
+                {{ current_user.rol_admin.value }}
+                {{ current_user.departamento_id.replace('D_', '') if current_user.departamento_id else 'General' }}
+            </h1>
         </div>
         <div class="text-end">
             <span class="badge bg-primary fs-6">{{ current_user.nombre }} {{ current_user.apellido }}</span><br>
@@ -69,28 +72,40 @@
                         <thead class="table-dark">
                             <tr>
                                 <th>ID</th>
-                                <th>Usuario</th>
-                                <th>Departamento</th> <th>Contenido</th>
+                                <th>Fecha</th> <th>Usuario</th>
+                                <th>Departamento</th> 
+                                <th>Contenido</th>
                                 <th>Estado</th>
-                                <th>Acciones</th>
+                                <th class="text-center">Foto</th> <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for rec in reclamos_admin %}
                             <tr>
                                 <td><strong>#{{ rec.id }}</strong></td>
+                                <td>{{ rec.fecha_creacion.strftime('%d/%m/%y %H:%M') if rec.fecha_creacion else '-' }}</td>
                                 <td>{{ rec.autor.nombre if rec.autor else 'Sistema' }}</td>
                                 <td>
                                     <span class="badge bg-light text-dark border">
                                         {{ rec.departamento_id.replace('D_', '') if rec.departamento_id else 'GENERAL' }}
                                     </span>
                                 </td>
-                                <td>{{ rec.contenido[:50] }}...</td>
+                                <td>{{ rec.contenido[:40] }}...</td>
                                 
                                 <td>
                                     <span class="badge {% if rec.estado == 'pendiente' %}bg-warning text-dark{% elif rec.estado == 'en_proceso' %}bg-info{% elif rec.estado == 'resuelto' %}bg-success{% else %}bg-danger{% endif %}">
                                         {{ rec.estado.upper() }}
                                     </span>
+                                </td>
+
+                                <td class="text-center">
+                                    {% if rec.adjunto_url %}
+                                    <a href="{{ url_for('static', filename='uploads/' + rec.adjunto_url) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                        <i class="bi bi-image"></i> Ver
+                                    </a>
+                                    {% else %}
+                                    <span class="text-muted small">Sin foto</span>
+                                    {% endif %}
                                 </td>
 
                                 <td>
@@ -119,7 +134,7 @@
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="6" class="text-center py-4 text-muted">No hay reclamos para mostrar.</td></tr>
+                            <tr><td colspan="8" class="text-center py-4 text-muted">No hay reclamos para mostrar.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -137,7 +152,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
-                <p>"Bienvenido al panel de Gestión de la Facultad de Ingeniería: Aquí podrá administrar los reclamos de los usuarios y visualizar estadísticas clave de su área de forma rápida y sencilla"
+                <p>"Bienvenido al panel de Gestión de la Facultad de Ingeniería: Aquí podrá administrar los reclamos de los usuarios y visualizar estadísticas clave de su área de forma rápida y sencilla"</p>
             </div>
         </div>
     </div>
@@ -147,17 +162,18 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('chartEstados').getContext('2d');
-        // Accedemos a data_analitica.stats según la estructura que definimos
         new Chart(ctx, {
             type: 'pie',
             data: {
-                labels: ['Pendientes', 'Resueltos'],
+                // CORRECCIÓN 3: Se incluyó "En Proceso" en etiquetas y datos
+                labels: ['Pendientes', 'En Proceso', 'Resueltos'],
                 datasets: [{
                     data: [
                         {{ data_analitica.stats.pendientes if data_analitica.stats else 0 }},
+                        {{ data_analitica.stats.en_proceso if data_analitica.stats else 0 }},
                         {{ data_analitica.stats.resueltos if data_analitica.stats else 0 }}
                     ],
-                    backgroundColor: ['#ffc107', '#198754'],
+                    backgroundColor: ['#ffc107', '#0dcaf0', '#198754'],
                     borderWidth: 2,
                     borderColor: '#ffffff'
                 }]

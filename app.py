@@ -283,8 +283,5 @@ if __name__ == '__main__':
     inicializar_base_de_datos() # Llamada única al iniciar
     app.run(debug=True)
 
-# agregarle nombre al dashboard de jefe departamento
-# el resto de estudiantes, el jefe y el secretario no pueden ver la foto subida en el reclamo de otro estudiate
 # el grafico de torta tiene resueltos y pendientes pero no en proceso
-# en la seccion de gestion reclamos del secretario o jefe no aparece la fecha de creación de los reclamos, tampoco aparece en la seccion ver reclamos que tienen los estudiantes
 # cuando te dice que se encontro un reclamo similar, no deberia dejar crear el reclamo si que el usuario confirme que no son similares
