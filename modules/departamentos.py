@@ -30,31 +30,36 @@ class Analitica:
     
     # modules/departamentos.py
 
-    def obtener_datos_dashboard(self, departamento_id=None):
-        from modules.reclamos import Reclamo
+    def obtener_datos_dashboard(self, depto_id: str) -> Dict[str, Any]:
+        from .reclamos import Reclamo # Importación local para evitar importes circulares
         
-        # Filtro de reclamos
-        if departamento_id:
-            query = Reclamo.query.filter_by(departamento_id=departamento_id).all()
-        else:
-            query = Reclamo.query.all()
-
-        # Lógica de estados para el gráfico
-        pendientes = len([r for r in query if r.estado == 'pendiente'])
-        resueltos = len([r for r in query if r.estado == 'resuelto'])
-
-        # Lógica para la Nube de Palabras
-        texto_total = " ".join([r.contenido.lower() for r in query])
-        palabras = [p for p in texto_total.split() if len(p) > 3] # Filtra palabras cortas
+        # Si depto_id es None (Secretario Técnico), traemos todos. 
+        # Si tiene ID (Jefe), filtramos por su departamento.
+        query = Reclamo.query
+        if depto_id:
+            query = query.filter_by(departamento_id=depto_id)
+        
+        reclamos = query.all()
+        
+        # Contamos cada estado
+        pendientes = len([r for r in reclamos if r.estado == "pendiente"])
+        en_proceso = len([r for r in reclamos if r.estado == "en_proceso"])
+        resueltos = len([r for r in reclamos if r.estado == "resuelto"])
+        
+        # Procesar palabras clave para la nube
+        texto_total = " ".join([r.contenido for r in reclamos])
+        palabras = [p.lower().strip('.,') for p in texto_total.split() if len(p) > 3]
         frecuencia = {}
         for p in palabras:
-            frecuencia[p] = frecuencia.get(p, 0) + 1
+            if p not in self.stopwords:
+                frecuencia[p] = frecuencia.get(p, 0) + 1
         
-        # IMPORTANTE: Retornar con la estructura exacta que pide el HTML
         return {
             "stats": {
                 "pendientes": pendientes,
-                "resueltos": resueltos
+                "en_proceso": en_proceso,
+                "resueltos": resueltos,
+                "total": len(reclamos)
             },
             "frecuencia": dict(sorted(frecuencia.items(), key=lambda x: x[1], reverse=True)[:15])
         }

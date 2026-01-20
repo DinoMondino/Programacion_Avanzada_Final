@@ -128,11 +128,15 @@
                             <div>
                                 <h6 class="text-primary mb-1">
                                     Reclamo #{{ r.id }} | 
-                                    <span class="badge bg-light text-dark border">
-                                        {{ r.departamento_id.replace('D_', '') if r.departamento_id else 'GENERAL' }}
+                                    <span class="badge bg-light text-dark border">{{ r.departamento_id.replace('D_', '') if r.departamento_id else 'GENERAL' }}</span>
+                                    
+                                    <span class="badge {% if r.estado == 'pendiente' %}bg-warning text-dark{% elif r.estado == 'en_proceso' %}bg-info{% elif r.estado == 'resuelto' %}bg-success{% else %}bg-secondary{% endif %} ms-2">
+                                        {{ r.estado.replace('_', ' ').upper() }}
                                     </span>
                                 </h6>
+                                
                                 <p class="mb-1 text-dark">{{ r.contenido }}</p>
+                                
                                 <div class="text-muted small">
                                     <i class="bi bi-calendar-event"></i> {{ r.fecha_creacion.strftime('%d/%m/%Y') if r.fecha_creacion else '-' }} |
                                     <i class="bi bi-people-fill"></i> Apoyos: <strong>{{ r.seguidores|length if r.seguidores else 0 }}</strong>
@@ -142,7 +146,7 @@
                             {% if r.usuario_id != current_user.id %}
                             <form action="{{ url_for('adherirse', id_reclamo=r.id) }}" method="post">
                                 <button class="btn btn-sm btn-success shadow-sm">
-                                    <i class="bi bi-hand-thumbs-up"></i> +1 Apoyar
+                                    <i class="bi bi-hand-thumbs-up"></i> Apoyar
                                 </button>
                             </form>
                             {% else %}
@@ -153,8 +157,7 @@
                 </div>
                 {% else %}
                 <div class="col-12 text-center py-5 text-muted">
-                    <i class="bi bi-chat-left-dots fs-1"></i>
-                    <p class="mt-2">No hay reclamos públicos para mostrar.</p>
+                    <p>No hay reclamos públicos para mostrar.</p>
                 </div>
                 {% endfor %}
             </div>

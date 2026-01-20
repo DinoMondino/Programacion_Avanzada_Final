@@ -309,6 +309,3 @@ def inicializar_base_de_datos():
 if __name__ == '__main__':
     inicializar_base_de_datos() # Llamada única al iniciar
     app.run(debug=True)
-
-# el grafico de torta tiene resueltos y pendientes pero no en proceso
-# cuando te dice que se encontro un reclamo similar, no deberia dejar crear el reclamo si que el usuario confirme que no son similares
