@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from .usuarios import db
 from enum import Enum
 from typing import List, Dict, Any
@@ -22,7 +22,7 @@ class Reclamo(db.Model):
     estado = db.Column(db.String(20), default="pendiente")
     departamento_id = db.Column(db.String(50))
     adjunto_url = db.Column(db.String(200))
-    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
     
     # Usuarios que apoyan este reclamo

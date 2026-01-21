@@ -75,10 +75,10 @@ class Gestor_Reclamos:
                 return False
             
             # Verificar si ya está adherido
-            if usuario in reclamo.apoyos:
+            if usuario in reclamo.seguidores:
                 return False
                 
-            reclamo.apoyos.append(usuario)
+            reclamo.seguidores.append(usuario)
             self.db.session.commit()
             return True
         return False

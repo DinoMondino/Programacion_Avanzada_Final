@@ -6,7 +6,7 @@ from .reclamos import EstadoReclamo
 class Analitica:
     def __init__(self, gestor_servicio):
         self._gestor = gestor_servicio
-        self.stopwords = ["el", "la", "los", "las", "un", "una", "y", "o", "de", "a", "en", "es", "para", "que", "con", "por", "su", "al"]
+        self.stopwords = gestor_servicio.clasificador_servicio.stopwords
 
     def get_estadisticas_generales(self, depto_id: str) -> Dict[str, Any]:
         reclamos = self._gestor.get_reclamos_por_departamento(depto_id)
