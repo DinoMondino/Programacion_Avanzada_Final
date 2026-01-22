@@ -36,8 +36,11 @@ class Reclamo(db.Model):
 
 
 class Clasificador:
-    def __init__(self, stopwords: List[str]):
-        self.stopwords = stopwords
+    def __init__(self, stopwords = None):
+        if stopwords is None:
+            self.stopwords = ["el", "la", "los", "las", "un", "una", "y", "o", "de", "a", "en", "es", "para", "que", "con", "por", "su", "al"]
+        else:
+            self.stopwords = stopwords
         self.keywords_por_depto = {
             "D_INFRAESTRUCTURA": ["luz", "agua", "techo", "baño", "edificio", "puerta", "ventana"],
             "D_INFORMATICA": ["wifi", "internet", "computadora", "servidor", "red", "sistema", "software", "programación"],
@@ -65,9 +68,11 @@ class Clasificador:
         ganadores = [d for d, v in contadores.items() if v == max_v]
         return {"departamento_id": ganadores[0]}
 
-    def encontrar_similares(self, contenido: str, historial_reclamos: dict) -> list:
+    # En tu clase Clasificador
+    def buscar_similares(self, contenido, historial_reclamos): # Ahora acepta 3 (self + 2)
         palabras_nuevo = set(self.extraer_palabras_clave(contenido))
         similares_ids = []
+        
         for rid, rec in historial_reclamos.items():
             palabras_viejo = set(self.extraer_palabras_clave(rec.contenido))
             if len(palabras_nuevo.intersection(palabras_viejo)) >= 2:

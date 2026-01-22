@@ -1,250 +1,201 @@
-# python app.py
-
 import os
 import io
 import csv
-import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.utils import secure_filename
 from functools import wraps
+
+# Importamos la base de datos, modelos y la nueva clase Analitica
+from modules.usuarios import db, Usuario, UsuarioFinal, JefeDepartamento, SecretarioTecnico
+from modules.reclamos import Reclamo, Clasificador
+from modules.gestor import Gestor_Reclamos
+from modules.departamentos import Analitica
 
 app = Flask(__name__)
 app.secret_key = 'super_secreto_uner'
 
-# --- 1. CONFIGURACIÓN DE RUTAS Y BASE DE DATOS ---
+# Configuración de base de datos
 basedir = os.path.abspath(os.path.dirname(__file__))
-
-# Carpeta de subidas
-app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'static', 'uploads')
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-# Configuración de base de datos con ruta absoluta para asegurar persistencia
-db_path = os.path.join(basedir, 'database.db')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Importamos la instancia de db desde el módulo de usuarios
-from modules.usuarios import db, Usuario, UsuarioFinal, JefeDepartamento, SecretarioTecnico, RolAdmin, Claustro
-from modules.reclamos import Reclamo, Clasificador
-from modules.gestor import Gestor_Reclamos
-
+# Inicialización del sistema
 db.init_app(app)
 
-# --- 2. DECORADOR DE AUTENTICACIÓN ---
+# --- NOTA: Usamos el mismo objeto clasificador para ambos ---
+clasificador = Clasificador()
+gestor = Gestor_Reclamos(db, clasificador)
+analitica_servicio = Analitica(gestor)
+
+# --- DECORADOR DE SEGURIDAD ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
             flash("Por favor, inicia sesión.", "warning")
-            return redirect(url_for('index'))
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
-# --- 3. RUTAS DE NAVEGACIÓN Y LOGIN ---
+# --- RUTAS DE NAVEGACIÓN ---
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return redirect(url_for('login'))
 
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    username = request.form.get('username')
-    password = request.form.get('password')
-    
-    user = Usuario.query.filter_by(username=username).first()
-    
-    if user and user.password == password:
-        session['user_id'] = user.id
-        if isinstance(user, (JefeDepartamento, SecretarioTecnico)):
-            return redirect(url_for('admin_dashboard'))
-        return redirect(url_for('user_dashboard'))
-    
-    flash("Usuario o contraseña incorrectos", "danger")
-    return redirect(url_for('index'))
+    if request.method == 'POST':
+        user = Usuario.query.filter_by(username=request.form['username']).first()
+        if user and user.password == request.form['password']:
+            session['user_id'] = user.id
+            if user.tipo_usuario in ['jefe', 'secretario']:
+                return redirect(url_for('admin_dashboard'))
+            return redirect(url_for('dashboard'))
+        flash("Usuario o contraseña incorrectas")
+
+    return render_template('index.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        nombre = request.form.get('nombre')
-        apellido = request.form.get('apellido')
-        claustro_str = request.form.get('claustro')
-        
-        if Usuario.query.filter_by(username=username).first():
-            flash("El nombre de usuario ya existe", "danger")
-            return redirect(url_for('register'))
-        
-        nuevo_usuario = UsuarioFinal(
-            username=username,
-            password=password,
-            nombre=nombre,
-            apellido=apellido,
-            claustro=Claustro[claustro_str],
-            rol_admin=RolAdmin.NINGUNO
+        u = UsuarioFinal(
+            username=request.form.get('username'),
+            password=request.form.get('password'),
+            nombre=request.form.get('nombre')
         )
-        
-        db.session.add(nuevo_usuario)
+        db.session.add(u)
         db.session.commit()
-        
-        flash("Registro exitoso. Ahora puedes iniciar sesión.", "success")
-        return redirect(url_for('index'))
-    
+        flash("Registro exitoso", "success")
+        return redirect(url_for('login'))
     return render_template('register.html')
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('index'))
-
-# --- 4. DASHBOARD USUARIO ---
-
-@app.route('/user_dashboard')
+@app.route('/dashboard')
 @login_required
-def user_dashboard():
+def dashboard():
     user = Usuario.query.get(session['user_id'])
-    todos_los_reclamos = Reclamo.query.all()
-    return render_template('user_dashboard.html', 
-                           current_user=user, 
-                           all_reclamos=todos_los_reclamos)
+    mis_reclamos = gestor.obtener_reclamos_para_usuario(user)
+    todos = gestor.obtener_todos_los_reclamos()
+    return render_template('user_dashboard.html', current_user=user, all_reclamos=todos)
 
-@app.route('/crear_reclamo', methods=['POST'])
-@login_required
-def crear_reclamo():
-    user = Usuario.query.get(session['user_id'])
-    contenido = request.form.get('contenido')
-    confirmado = request.form.get('confirmado') == 'true'
-    file = request.files.get('foto')
-    
-    adjunto_url = None
-    if file and file.filename != '':
-        filename = secure_filename(f"{datetime.datetime.now().timestamp()}_{file.filename}")
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        adjunto_url = filename
-
-    if not confirmado:
-        palabras = [p for p in contenido.split() if len(p) > 3]
-        similares = []
-        if palabras:
-            similares = Reclamo.query.filter(
-                Reclamo.estado == 'pendiente'
-            ).filter(
-                db.or_(*[Reclamo.contenido.like(f"%{p}%") for p in palabras[:3]])
-            ).limit(3).all()
-
-        if similares:
-            return render_template('user_dashboard.html', 
-                                   current_user=user, 
-                                   all_reclamos=Reclamo.query.all(),
-                                   reclamos_similares=similares,
-                                   contenido_pendiente=contenido)
-
-    gestor_serv = Gestor_Reclamos(db, Clasificador(stopwords=[]))
-    resultado = gestor_serv.crear_reclamo(contenido, adjunto_url, user.id)
-    
-    flash(resultado['mensaje'], "success")
-    return redirect(url_for('user_dashboard'))
-
-@app.route('/adherirse/<int:id_reclamo>', methods=['POST'])
-@login_required
-def adherirse(id_reclamo):
-    reclamo = Reclamo.query.get_or_404(id_reclamo)
-    user = Usuario.query.get(session['user_id'])
-    
-    if user in reclamo.seguidores:
-        flash("Ya has apoyado este reclamo.", "warning")
-    else:
-        reclamo.seguidores.append(user)
-        db.session.commit()
-        flash("¡Apoyo registrado con éxito!", "success")
-        
-    return redirect(url_for('user_dashboard'))
-
-# --- 5. DASHBOARD ADMINISTRADOR ---
-
-@app.route('/admin_dashboard')
+@app.route('/admin/dashboard')
 @login_required
 def admin_dashboard():
-    from modules.departamentos import Analitica
     user = Usuario.query.get(session['user_id'])
-    gestor_serv = Gestor_Reclamos(db, Clasificador(stopwords=[]))
-    analitica_serv = Analitica(gestor_serv)
     
-    if isinstance(user, JefeDepartamento):
-        reclamos = Reclamo.query.filter_by(departamento_id=user.departamento_id).all()
-        datos_an = analitica_serv.obtener_datos_dashboard(user.departamento_id)
+    if user.tipo_usuario == 'secretario':
+        reclamos_lista = Reclamo.query.all()
+        depto_para_analitica = None 
     else:
-        reclamos = Reclamo.query.all()
-        datos_an = analitica_serv.obtener_datos_dashboard(None)
-        
+        reclamos_lista = Reclamo.query.filter_by(departamento_id=user.departamento_id).all()
+        depto_para_analitica = user.departamento_id
+    
+    datos_analitica = analitica_servicio.obtener_datos_dashboard(depto_para_analitica)
+    
     return render_template('admin_dashboard.html', 
-                           current_user=user, 
-                           reclamos_admin=reclamos, 
-                           data_analitica=datos_an)
+                           reclamos_admin=reclamos_lista, 
+                           data_analitica=datos_analitica, 
+                           current_user=user)
 
-@app.route('/actualizar_estado/<int:id>', methods=['POST'])
+# --- ACCIONES ---
+
+@app.route('/admin/cambiar_estado/<int:id>', methods=['POST'])
 @login_required
 def actualizar_estado(id):
-    nuevo_estado = request.form.get('nuevo_estado') 
-    reclamo = Reclamo.query.get_or_404(id)
-    if reclamo:
-        reclamo.estado = nuevo_estado
-        db.session.commit()
-        flash(f"El reclamo #{id} ahora está: {nuevo_estado}", "success")
+    nuevo_est = request.form.get('nuevo_estado')
+    if gestor.gestionar_estado_reclamo(id, nuevo_est):
+        flash("Estado actualizado", "success")
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/crear_reclamo', methods=['GET', 'POST'])
+@login_required
+def crear_reclamo():
+    if request.method == 'POST':
+        contenido = request.form.get('contenido')
+        confirmar_nuevo = request.form.get('confirmar_nuevo')
+        
+        # 1. Buscar similares usando el objeto 'clasificador'
+        # Creamos el historial en el momento para evitar el NameError
+        historial_reclamos = {r.id: r for r in Reclamo.query.all()}
+        similares_ids = clasificador.buscar_similares(contenido, historial_reclamos) 
+        
+        if similares_ids and not confirmar_nuevo:
+            similar = Reclamo.query.get(similares_ids[0])
+            return render_template('crear_reclamo.html', 
+                                   reclamo_similar=similar, 
+                                   contenido_previo=contenido)
+
+        # 2. Crear el reclamo si no hay similares o se confirmó
+        gestor.crear_reclamo(contenido, None, session['user_id'])
+        flash("Reclamo creado con éxito.", "success")
+        return redirect(url_for('dashboard'))
+        
+    return render_template('crear_reclamo.html', reclamo_similar=None)
+
+@app.route('/reclamo/adherir/<int:id_reclamo>', methods=['GET', 'POST']) # <--- Agrega esto
+@login_required
+def adherirse(id_reclamo):
+    usuario_id = session.get('user_id')
+    exito = gestor.adherirse_a_reclamo(id_reclamo, usuario_id)
+    
+    if exito:
+        flash("Te has adherido al reclamo correctamente.", "success")
+    else:
+        flash("Ya estás adherido a este reclamo o eres el autor.", "info")
+        
+    return redirect(url_for('dashboard'))
 
 @app.route('/descargar_reporte')
 @login_required
 def descargar_reporte():
     user = Usuario.query.get(session['user_id'])
-    if isinstance(user, JefeDepartamento):
-        reclamos = Reclamo.query.filter_by(departamento_id=user.departamento_id).all()
-    else:
+    if user.tipo_usuario == 'secretario':
         reclamos = Reclamo.query.all()
+    else:
+        reclamos = Reclamo.query.filter_by(departamento_id=user.departamento_id).all()
 
     output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['ID', 'Contenido', 'Estado', 'Departamento', 'Fecha'])
-    for r in reclamos:
-        writer.writerow([r.id, r.contenido, r.estado, r.departamento_id, r.fecha_creacion])
+    writer = csv.writer(output, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(['ID', 'Fecha', 'Usuario', 'Departamento', 'Contenido', 'Estado', 'Apoyos'])
     
-    output.seek(0)
-    return Response(output, mimetype="text/csv", 
-                    headers={"Content-disposition": "attachment; filename=reporte.csv"})
+    for r in reclamos:
+        cant_apoyos = len(r.seguidores) if hasattr(r, 'seguidores') and r.seguidores else 0
+        nombre_autor = r.autor.nombre if hasattr(r, 'autor') and r.autor else "Anónimo"
+        
+        writer.writerow([
+            r.id,
+            r.fecha_creacion.strftime('%d/%m/%Y %H:%M') if r.fecha_creacion else '-',
+            nombre_autor,
+            r.departamento_id,
+            r.contenido.replace('\n', ' ').replace('\r', ' '),
+            r.estado.upper() if isinstance(r.estado, str) else str(r.estado),
+            cant_apoyos
+        ])
 
-@app.route('/derivar_reclamo', methods=['POST'])
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-disposition": f"attachment; filename=reporte.csv"}
+    )
+
+@app.route('/admin/derivar', methods=['POST'])
 @login_required
 def derivar_reclamo():
-    reclamo_id = request.form.get('id_reclamo') 
-    nuevo_depto = request.form.get('nuevo_depto')
-    reclamo = Reclamo.query.get(reclamo_id)
-    if reclamo:
-        reclamo.departamento_id = nuevo_depto
-        db.session.commit()
-        flash(f"Reclamo #{reclamo_id} derivado a {nuevo_depto}.", "success")
+    id_rec = request.form.get('id_reclamo')
+    nuevo_d = request.form.get('nuevo_depto')
+    if gestor.derivar_reclamo(id_rec, nuevo_d):
+        flash(f"Reclamo #{id_rec} derivado correctamente.", "success")
     return redirect(url_for('admin_dashboard'))
 
-# --- 6. INICIALIZACIÓN ---
-def inicializar_base_de_datos():
-    with app.app_context():
-        # IMPORTANTE: Aseguramos que SQLAlchemy detecte todos los modelos antes de crear tablas
-        import modules.usuarios
-        import modules.reclamos
-        db.create_all()
-        
-        # Crear usuarios por defecto si no existen
-        if not Usuario.query.filter_by(username='secretario').first():
-            admin = SecretarioTecnico(username='secretario', password='1234', nombre='Admin')
-            db.session.add(admin)
-
-        if not Usuario.query.filter_by(username='jefe_infra').first():
-            jefe = JefeDepartamento(username='jefe_infra', password='1234', nombre='Roberto', 
-                                    departamento_id='D_INFRAESTRUCTURA')
-            db.session.add(jefe)
-
-        db.session.commit()
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    inicializar_base_de_datos()
+    with app.app_context():
+        db.create_all()
+        if not Usuario.query.filter_by(username='admin').first():
+            db.session.add(SecretarioTecnico(username='admin', password='123', nombre='Admin'))
+            db.session.commit()
     app.run(debug=True)

@@ -8,13 +8,15 @@
                 <i class="bi bi-question-circle"></i> Ayuda
             </button>
             <h1 class="mb-0">
-                {{ current_user.rol_admin.value }}
-                {{ current_user.departamento_id.replace('D_', '') if current_user.departamento_id else 'General' }}
+                <i class=></i> {{ current_user.rol_admin.value }}
+                {% if current_user.tipo_usuario == 'jefe' %}
+                    - {{ current_user.departamento_id.replace('D_', '') }}
+                {% endif %}
             </h1>
         </div>
         <div class="text-end">
-            <span class="badge bg-primary fs-6">{{ current_user.nombre }} {{ current_user.apellido }}</span><br>
-            <small class="text-muted">Depto: {{ current_user.departamento_id or 'General' }}</small>
+            <span class="badge bg-primary fs-6">{{ current_user.nombre }} {{ current_user.apellido if current_user.apellido else '' }}</span><br>
+            <small class="text-muted">Área: {{ current_user.departamento_id or 'General' }}</small>
         </div>
     </div>
     
@@ -46,17 +48,17 @@
 
                 <div class="col-md-7">
                     <div class="card shadow-sm mb-4 border-0">
-                        <div class="card-header bg-white"><h5>Nube de Palabras (Top 15)</h5></div>
+                        <div class="card-header bg-white"><h5>Nube de Palabras Clave</h5></div>
                         <div class="card-body text-center">
-                            <div class="p-4 border rounded bg-light min-vh-25">
+                            <div class="p-4 border rounded bg-light">
                                 {% if data_analitica.frecuencia %}
                                     {% for palabra, cuenta in data_analitica.frecuencia.items() %}
-                                        <span style="font-size: {{ 14 + (cuenta * 4) }}px; margin: 8px; display: inline-block;" class="text-primary fw-bold">
+                                        <span style="font-size: {{ 14 + (cuenta * 3) }}px; margin: 5px;" class="text-primary fw-bold d-inline-block">
                                             {{ palabra }}
                                         </span>
                                     {% endfor %}
                                 {% else %}
-                                    <p class="text-muted">No hay palabras suficientes para procesar.</p>
+                                    <p class="text-muted">No hay datos para generar la nube de palabras.</p>
                                 {% endif %}
                             </div>
                         </div>
@@ -72,36 +74,57 @@
                         <thead class="table-dark">
                             <tr>
                                 <th>ID</th>
-                                <th>Fecha</th> <th>Usuario</th>
-                                <th>Departamento</th> 
+                                <th>Fecha</th>
+                                <th>Usuario</th>
+                                {% if current_user.tipo_usuario == 'secretario' %}
+                                    <th>Departamento</th>
+                                {% endif %}
                                 <th>Contenido</th>
+                                <th class="text-center">Apoyos</th>
                                 <th>Estado</th>
-                                <th class="text-center">Foto</th> <th>Acciones</th>
+                                <th class="text-center">Foto</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for rec in reclamos_admin %}
                             <tr>
                                 <td><strong>#{{ rec.id }}</strong></td>
-                                <td>{{ rec.fecha_creacion.strftime('%d/%m/%y %H:%M') if rec.fecha_creacion else '-' }}</td>
-                                <td>{{ rec.autor.nombre if rec.autor else 'Sistema' }}</td>
+                                <td><small>{{ rec.fecha_creacion.strftime('%d/%m/%y') if rec.fecha_creacion else '-' }}</small></td>
+                                <td>{{ rec.autor.nombre if rec.autor else 'Anónimo' }}</td>
+                                
+                                {% if current_user.tipo_usuario == 'secretario' %}
                                 <td>
                                     <span class="badge bg-light text-dark border">
-                                        {{ rec.departamento_id.replace('D_', '') if rec.departamento_id else 'GENERAL' }}
+                                        {{ rec.departamento_id.replace('D_', '') if rec.departamento_id else 'Sin Área' }}
                                     </span>
                                 </td>
-                                <td>{{ rec.contenido[:40] }}...</td>
+                                {% endif %}
+
+                                <td><small title="{{ rec.contenido }}">{{ rec.contenido[:35] }}...</small></td>
                                 
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-primary position-relative" 
+                                            data-bs-toggle="modal" data-bs-target="#modalApoyos{{ rec.id }}">
+                                        <i class="bi bi-people-fill"></i>
+                                        <span class="badge bg-danger rounded-pill">{{ rec.seguidores|length if rec.seguidores else 0 }}</span>
+                                    </button>
+                                </td>
+
                                 <td>
-                                    <span class="badge {% if rec.estado == 'pendiente' %}bg-warning text-dark{% elif rec.estado == 'en_proceso' %}bg-info{% elif rec.estado == 'resuelto' %}bg-success{% else %}bg-danger{% endif %}">
-                                        {{ rec.estado.upper() }}
-                                    </span>
+                                    <form action="{{ url_for('actualizar_estado', id=rec.id) }}" method="post">
+                                        <select name="nuevo_estado" onchange="this.form.submit()" class="form-select form-select-sm w-auto">
+                                            <option value="pendiente" {% if rec.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                                            <option value="en_proceso" {% if rec.estado == 'en_proceso' %}selected{% endif %}>En Proceso</option>
+                                            <option value="resuelto" {% if rec.estado == 'resuelto' %}selected{% endif %}>Resuelto</option>
+                                        </select>
+                                    </form>
                                 </td>
 
                                 <td class="text-center">
                                     {% if rec.adjunto_url %}
-                                    <a href="{{ url_for('static', filename='uploads/' + rec.adjunto_url) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                                        <i class="bi bi-image"></i> Ver
+                                    <a href="{{ url_for('static', filename='uploads/' + rec.adjunto_url) }}" target="_blank" class="btn btn-sm btn-light border">
+                                        <i class="bi bi-image text-info"></i>
                                     </a>
                                     {% else %}
                                     <span class="text-muted small">Sin foto</span>
@@ -109,32 +132,44 @@
                                 </td>
 
                                 <td>
-                                    <div class="d-flex align-items-center">
-                                        <form action="{{ url_for('actualizar_estado', id=rec.id) }}" method="post" class="d-inline">
-                                            <select name="nuevo_estado" onchange="this.form.submit()" class="form-select form-select-sm d-inline-block w-auto">
-                                                <option value="" disabled selected>Estado...</option>
-                                                <option value="pendiente">Pendiente</option>
-                                                <option value="en_proceso">En Proceso</option>
-                                                <option value="resuelto">Resuelto</option>
-                                            </select>
-                                        </form>
-
-                                        {% if current_user.rol_admin.value == "Secretario Técnico" %}
-                                        <form action="{{ url_for('derivar_reclamo') }}" method="post" class="d-inline ms-1">
-                                            <input type="hidden" name="id_reclamo" value="{{ rec.id }}">
-                                            <select name="nuevo_depto" onchange="this.form.submit()" class="form-select form-select-sm border-primary d-inline-block w-auto">
-                                                <option value="" disabled selected>Derivar...</option>
-                                                <option value="D_INFRAESTRUCTURA">Infraestructura</option>
-                                                <option value="D_INFORMATICA">Informática</option>
-                                                <option value="D_SECRETARIA">Secretaría</option>
-                                            </select>
-                                        </form>
-                                        {% endif %}
-                                    </div>
+                                    {% if current_user.tipo_usuario == 'secretario' %}
+                                    <form action="{{ url_for('derivar_reclamo') }}" method="post" class="d-inline">
+                                        <input type="hidden" name="id_reclamo" value="{{ rec.id }}">
+                                        <select name="nuevo_depto" onchange="this.form.submit()" class="form-select form-select-sm border-primary w-auto d-inline">
+                                            <option value="" disabled selected>Derivar...</option>
+                                            <option value="D_INFRAESTRUCTURA">Infraestructura</option>
+                                            <option value="D_INFORMATICA">Informática</option>
+                                            <option value="D_SECRETARIA">Secretaría</option>
+                                        </select>
+                                    </form>
+                                    {% else %}
+                                        <span class="text-muted small">Solo lectura</span>
+                                    {% endif %}
                                 </td>
                             </tr>
-                            {% else %}
-                            <tr><td colspan="8" class="text-center py-4 text-muted">No hay reclamos para mostrar.</td></tr>
+
+                            <div class="modal fade" id="modalApoyos{{ rec.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-sm modal-dialog-centered">
+                                    <div class="modal-content shadow border-0">
+                                        <div class="modal-header bg-light py-2">
+                                            <h6 class="modal-title">Usuarios que apoyan</h6>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-0">
+                                            <ul class="list-group list-group-flush">
+                                                {% for seg in rec.seguidores %}
+                                                    <li class="list-group-item small">
+                                                        <i class="bi bi-person-circle me-2 text-primary"></i>
+                                                        {{ seg.nombre }} {{ seg.apellido if seg.apellido else '' }}
+                                                    </li>
+                                                {% else %}
+                                                    <li class="list-group-item small text-muted text-center">Sin apoyos registrados</li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -144,15 +179,23 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalAyuda" tabindex="-1" aria-labelledby="modalAyudaLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+<div class="modal fade" id="modalAyuda" tabindex="-1">
+    <div class="modal-dialog">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-info text-white">
-                <h5 class="modal-title" id="modalAyudaLabel"><i class="bi bi-info-circle"></i> Tutorial del Sistema</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title"><i class="bi bi-info-circle"></i> Ayuda del Panel</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4">
-                <p>"Bienvenido al panel de Gestión de la Facultad de Ingeniería: Aquí podrá administrar los reclamos de los usuarios y visualizar estadísticas clave de su área de forma rápida y sencilla"</p>
+            <div class="modal-body">
+                <p>Como <strong>{{ current_user.tipo_usuario }}</strong>, puedes:</p>
+                <ul>
+                    <li>Cambiar el estado de los reclamos (Pendiente, Proceso, Resuelto).</li>
+                    <li>Ver quiénes apoyan cada pedido haciendo clic en el icono de personas.</li>
+                    <li>Descargar reportes en CSV para Excel.</li>
+                    {% if current_user.tipo_usuario == 'secretario' %}
+                        <li>Derivar reclamos mal asignados a otros departamentos.</li>
+                    {% endif %}
+                </ul>
             </div>
         </div>
     </div>
@@ -163,9 +206,8 @@
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('chartEstados').getContext('2d');
         new Chart(ctx, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
-                // CORRECCIÓN 3: Se incluyó "En Proceso" en etiquetas y datos
                 labels: ['Pendientes', 'En Proceso', 'Resueltos'],
                 datasets: [{
                     data: [
@@ -174,7 +216,7 @@
                         {{ data_analitica.stats.resueltos if data_analitica.stats else 0 }}
                     ],
                     backgroundColor: ['#ffc107', '#0dcaf0', '#198754'],
-                    borderWidth: 2,
+                    borderWidth: 5,
                     borderColor: '#ffffff'
                 }]
             },
