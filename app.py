@@ -58,15 +58,37 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
+        # 1. Extraemos los datos del formulario primero
+        username = request.form.get('username')
+        password = request.form.get('password')
+        nombre = request.form.get('nombre')
+        apellido = request.form.get('apellido')
+        claustro = request.form.get('claustro')
+
+        # 2. Ahora sí podemos verificar si el username ya existe
+        if Usuario.query.filter_by(username=username).first():
+            flash("El usuario ya existe", "danger")
+            return redirect(url_for('register'))
+        
+        # 3. Creamos el objeto con los datos ya extraídos
         u = UsuarioFinal(
-            username=request.form.get('username'),
-            password=request.form.get('password'),
-            nombre=request.form.get('nombre')
+            username=username,
+            password=password,
+            nombre=nombre,
+            apellido=apellido,
+            claustro=claustro
         )
-        db.session.add(u)
-        db.session.commit()
-        flash("Registro exitoso", "success")
-        return redirect(url_for('login'))
+        
+        try:
+            db.session.add(u)
+            db.session.commit()
+            flash("Registro exitoso", "success")
+            return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error al registrar: {e}", "danger")
+            return redirect(url_for('register'))
+
     return render_template('register.html')
 
 @app.route('/dashboard')

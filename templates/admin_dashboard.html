@@ -91,7 +91,7 @@
                             <tr>
                                 <td><strong>#{{ rec.id }}</strong></td>
                                 <td><small>{{ rec.fecha_creacion.strftime('%d/%m/%y') if rec.fecha_creacion else '-' }}</small></td>
-                                <td>{{ rec.autor.nombre if rec.autor else 'Anónimo' }}</td>
+                                <td>{{ rec.autor.nombre }} {{ rec.autor.apellido if rec.autor.apellido else '' }}</td>
                                 
                                 {% if current_user.tipo_usuario == 'secretario' %}
                                 <td>
