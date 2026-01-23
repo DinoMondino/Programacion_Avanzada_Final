@@ -194,8 +194,39 @@ def logout():
 
 if __name__ == '__main__':
     with app.app_context():
+        # 1. Crea las tablas si no existen
+        db.create_all()
+
+        # 2. Crear Secretario si no existe
+        if not Usuario.query.filter_by(username='secretario').first():
+            admin = SecretarioTecnico(
+                username='secretario', 
+                password='1234', 
+                nombre='Secretario',
+                apellido='Técnico'
+            )
+            db.session.add(admin)
+            print("Usuario 'secretario' creado.")
+
+        # 3. Crear Jefe de Infraestructura si no existe
+        if not Usuario.query.filter_by(username='jefe_infra').first():
+            jefe = JefeDepartamento(
+                username='jefe_infra', 
+                password='1234', 
+                nombre='Jefe',
+                apellido='Infraestructura',
+                departamento_id='D_INFRAESTRUCTURA' # Asegúrate que este ID coincida con tu Clasificador
+            )
+            db.session.add(jefe)
+            print("Usuario 'jefe_infra' creado.")
+
+        # 4. Guardar cambios
+        db.session.commit()
+        
+    app.run(debug=True)
+    with app.app_context():
         db.create_all()
         if not Usuario.query.filter_by(username='admin').first():
-            db.session.add(SecretarioTecnico(username='admin', password='123', nombre='Admin'))
+            db.session.add(SecretarioTecnico(username='admin', password='1234', nombre='Admin'))
             db.session.commit()
     app.run(debug=True)
