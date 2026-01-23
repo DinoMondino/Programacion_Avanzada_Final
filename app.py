@@ -223,10 +223,38 @@ if __name__ == '__main__':
         # 4. Guardar cambios
         db.session.commit()
         
-    app.run(debug=True)
+if __name__ == '__main__':
     with app.app_context():
+        # 1. Crea las tablas SOLO si no existen. 
+        # Si ya existen, no toca los datos que hay adentro.
         db.create_all()
-        if not Usuario.query.filter_by(username='admin').first():
-            db.session.add(SecretarioTecnico(username='admin', password='1234', nombre='Admin'))
-            db.session.commit()
+
+        # 2. Verificar y crear Secretario (solo si no existe)
+        if not Usuario.query.filter_by(username='secretario').first():
+            admin = SecretarioTecnico(
+                username='secretario', 
+                password='1234', 
+                nombre='Secretario',
+                apellido='Técnico'
+            )
+            db.session.add(admin)
+            print(">>> Usuario 'secretario' creado por primera vez.")
+
+        # 3. Verificar y crear Jefe de Infra (solo si no existe)
+        if not Usuario.query.filter_by(username='jefe_infra').first():
+            jefe = JefeDepartamento(
+                username='jefe_infra', 
+                password='1234', 
+                nombre='Jefe',
+                apellido='Infraestructura',
+                departamento_id='D_INFRAESTRUCTURA'
+            )
+            db.session.add(jefe)
+            print(">>> Usuario 'jefe_infra' creado por primera vez.")
+
+        # 4. Guardar solo si hubo cambios
+        db.session.commit()
+        
+    # 5. IMPORTANTE: Esta debe ser la última línea activa.
+    # El modo debug=True hace que el código se reinicie solo al guardar cambios.
     app.run(debug=True)
