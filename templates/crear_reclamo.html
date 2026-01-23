@@ -33,19 +33,21 @@
                     {% endif %}
 
                     {# --- FORMULARIO NORMAL --- #}
-                    <form action="{{ url_for('crear_reclamo') }}" method="post" {% if reclamo_similar %}style="opacity: 0.5; pointer-events: none;"{% endif %}>
+                    <form action="{{ url_for('crear_reclamo') }}" method="post" enctype="multipart/form-data" {% if reclamo_similar %}style="opacity: 0.5; pointer-events: none;"{% endif %}>
                         <div class="mb-3">
                             <label for="contenido" class="form-label">Describe el problema:</label>
-                            <textarea name="contenido" id="contenido" rows="4" class="form-control" placeholder="Ej: No funciona el proyector del Aula 1..." required>{{ contenido_previo if contenido_previo else '' }}</textarea>
+                            <textarea name="contenido" id="contenido" rows="4" class="form-control" required>{{ contenido_previo if contenido_previo else '' }}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Adjuntar imagen (opcional):</label>
+                            <input type="file" name="foto" class="form-control" accept="image/*">
                         </div>
                         
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="bi bi-send"></i> Enviar Reclamo
-                            </button>
+                            <button type="submit" class="btn btn-primary btn-lg">Enviar Reclamo</button>
                         </div>
                     </form>
-
                 </div>
             </div>
         </div>

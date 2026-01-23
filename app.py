@@ -3,6 +3,7 @@ import io
 import csv
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
 from functools import wraps
+from werkzeug.utils import secure_filename
 
 # Importamos la base de datos, modelos y la nueva clase Analitica
 from modules.usuarios import db, Usuario, UsuarioFinal, JefeDepartamento, SecretarioTecnico
@@ -17,6 +18,13 @@ app.secret_key = 'super_secreto_uner'
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+UPLOAD_FOLDER = 'static/uploads'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Crear la carpeta si no existe
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 # Inicialización del sistema
 db.init_app(app)
@@ -133,8 +141,14 @@ def actualizar_estado(id):
 def crear_reclamo():
     if request.method == 'POST':
         contenido = request.form.get('contenido')
+        archivo = request.files.get('foto')
         confirmar_nuevo = request.form.get('confirmar_nuevo')
         
+        nombre_archivo = secure_filename(archivo.filename)
+        archivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo))
+        # Creamos la URL que se guardará en la base de datos
+        url_foto = url_for('static', filename='uploads/' + filename)
+
         # 1. Buscar similares usando el objeto 'clasificador'
         # Creamos el historial en el momento para evitar el NameError
         historial_reclamos = {r.id: r for r in Reclamo.query.all()}
@@ -147,7 +161,11 @@ def crear_reclamo():
                                    contenido_previo=contenido)
 
         # 2. Crear el reclamo si no hay similares o se confirmó
-        gestor.crear_reclamo(contenido, None, session['user_id'])
+        gestor.crear_reclamo(
+            contenido=contenido, 
+            adjunto=nombre_archivo, # Guardamos el nombre en la BD
+            usuario_id=session['user_id']
+        )
         flash("Reclamo creado con éxito.", "success")
         return redirect(url_for('dashboard'))
         
