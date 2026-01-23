@@ -143,11 +143,14 @@ def crear_reclamo():
         contenido = request.form.get('contenido')
         archivo = request.files.get('foto')
         confirmar_nuevo = request.form.get('confirmar_nuevo')
-        
-        nombre_archivo = secure_filename(archivo.filename)
-        archivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo))
-        # Creamos la URL que se guardará en la base de datos
-        url_foto = url_for('static', filename='uploads/' + filename)
+
+        nombre_archivo = None
+        # Verificamos si subieron una foto
+        if archivo and archivo.filename != '':
+            # Usamos el nombre original
+            nombre_archivo = archivo.filename
+            # Guardamos el archivo físicamente en la carpeta
+            archivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo))
 
         # 1. Buscar similares usando el objeto 'clasificador'
         # Creamos el historial en el momento para evitar el NameError
