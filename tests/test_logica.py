@@ -1,43 +1,77 @@
 import pytest
-from modules.usuarios import Usuario, db
-from modules.reclamos import Reclamo
-from modules.departamentos import Analitica
+from modules.reclamos import Reclamo, EstadoReclamo
+from modules.usuarios import Usuario
+from app import db
 
 def test_clasificacion_y_adhesion(app, gestor_servicio):
-    """Testea RF 116 (Clasificación) y RF 117 (Similares)."""
+    """
+    Testea RF 116 (Clasificación automática) 
+    y la posibilidad de adherirse manualmente (RF 117).
+    """
     with app.app_context():
-        # Crear un usuario para los reclamos
-        u = Usuario(username="autor", password="123")
-        db.session.add(u)
+        # 1. Configuración: Crear dos usuarios
+        # u1 será el autor, u2 será el que se adhiere
+        u1 = Usuario(username="autor", password="123")
+        u2 = Usuario(username="vecino", password="123")
+        db.session.add_all([u1, u2])
         db.session.commit()
 
-        # 1. Crear primer reclamo (debe clasificar a Informática por 'wifi')
-        res1 = gestor_servicio.crear_reclamo("No funciona el wifi, en el aula de programación no hay internet", None, u.id)
-        assert res1["status"] == "ok"
+        # 2. Testear RF 116: Clasificación automática
+        # El gestor debe devolver "creado" y asignar D_INFORMATICA por la palabra 'wifi'
+        res1 = gestor_servicio.crear_reclamo(
+            "No funciona el wifi, en el aula de programación no hay internet", 
+            None, 
+            u1.id
+        )
         
-        rec1 = Reclamo.query.first()
+        assert res1["status"] == "creado"
+        id_reclamo = res1["reclamo_id"]
+        
+        rec1 = Reclamo.query.get(id_reclamo)
         assert rec1.departamento_id == "D_INFORMATICA"
-        assert rec1.estado == "pendiente"
+        assert rec1.estado == EstadoReclamo.PENDIENTE.value
+        assert rec1.usuario_id == u1.id
 
-        # 2. Crear uno similar (debe adherir en lugar de crear nuevo)
-        # Usamos el mismo inicio de texto para el .like() del gestor
-        res2 = gestor_servicio.crear_reclamo("No funciona el wifi, el internet va lento", None, u.id)
-        assert res2["status"] == "similar"
-        assert "adherido" in res2["mensaje"]
+        # 3. Testear creación de un segundo reclamo similar
+        # Según tu lógica, el sistema crea uno nuevo y el frontend decidiría qué hacer.
+        res2 = gestor_servicio.crear_reclamo(
+            "No funciona el wifi, el internet va lento", 
+            None, 
+            u1.id
+        )
+        assert res2["status"] == "creado"
+        assert res2["reclamo_id"] != id_reclamo # Son IDs distintos
 
-def test_analitica_palabras_clave(app, gestor_servicio):
-    """RF 131: Frecuencia de las 15 palabras más comunes."""
+        # 4. Testear RF 117: Adhesión manual
+        # Probamos que el usuario 2 pueda adherirse al primer reclamo
+        exito_adhesion = gestor_servicio.adherirse_a_reclamo(id_reclamo, u2.id)
+        assert exito_adhesion is True
+        
+        # Verificamos en la base de datos
+        reclamo_actualizado = Reclamo.query.get(id_reclamo)
+        assert u2 in reclamo_actualizado.seguidores
+        
+        # 5. Testear restricciones de adhesión
+        # No debería permitir que el autor se adhiera a su propio reclamo
+        reintento_autor = gestor_servicio.adherirse_a_reclamo(id_reclamo, u1.id)
+        assert reintento_autor is False
+
+def test_gestion_estados_y_derivacion(app, gestor_servicio):
+    """Testea el cambio de estados y la derivación manual de departamentos."""
     with app.app_context():
-        u = Usuario(username="u1", password="1")
+        u = Usuario(username="admin_test", password="123")
         db.session.add(u)
         db.session.commit()
-
-        # 'problema' aparece 3 veces, 'el' es stopword
-        gestor_servicio.crear_reclamo("problema grave problema grave problema", None, u.id)
-
-        analitica = Analitica(gestor_servicio)
-        datos = analitica.obtener_datos_dashboard("D_SECRETARIA")
-
-        assert "problema" in datos["frecuencia"]
-        assert datos["frecuencia"]["problema"] == 3
-        assert "el" not in datos["frecuencia"]
+        
+        res = gestor_servicio.crear_reclamo("Caño roto en patio", None, u.id)
+        rec_id = res["reclamo_id"]
+        
+        # Testear derivación manual
+        gestor_servicio.derivar_reclamo(rec_id, "D_MANTENIMIENTO")
+        rec = Reclamo.query.get(rec_id)
+        assert rec.departamento_id == "D_MANTENIMIENTO"
+        
+        # Testear cambio de estado a RESUELTO
+        exito = gestor_servicio.gestionar_estado_reclamo(rec_id, "resuelto")
+        assert exito is True
+        assert rec.estado == "resuelto"

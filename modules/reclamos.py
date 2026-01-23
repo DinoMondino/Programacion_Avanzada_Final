@@ -3,12 +3,13 @@ from .usuarios import db
 from enum import Enum
 from typing import List, Dict, Any
 
-
+# Tabla intermedia para gestionar la relación muchos-a-muchos (N:M) entre usuarios y reclamos (adhesiones).
 adhesiones = db.Table('adhesiones',
     db.Column('usuario_id', db.Integer, db.ForeignKey('usuarios.id'), primary_key=True),
     db.Column('reclamo_id', db.Integer, db.ForeignKey('reclamos.id'), primary_key=True)
 )
 
+# Definición del Enum para los estados de los reclamos
 class EstadoReclamo(Enum):
     INVÁLIDO = "inválido"
     PENDIENTE = "pendiente"
@@ -24,16 +25,15 @@ class Reclamo(db.Model):
     adjunto_url = db.Column(db.String(200))
     fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
-    
     # Usuarios que apoyan este reclamo
     seguidores = db.relationship('Usuario', secondary=adhesiones, backref='reclamos_apoyados')
 
     def get_num_adherentes(self) -> int:
         return len(self.seguidores)
 
+    # Representación para depuración
     def __repr__(self):
         return f"<Reclamo {self.id} - {self.estado.value}>"
-
 
 class Clasificador:
     def __init__(self, stopwords = None):
@@ -51,30 +51,30 @@ class Clasificador:
         palabras = contenido.lower().split()
         return [p.strip('.,;!?') for p in palabras 
                 if p.strip('.,;!?') not in self.stopwords and len(p) > 2]
+        # Extraemos palabras que no sean stopwords y tengan más de 2 caracteres
 
     def clasificar(self, contenido: str) -> Dict[str, Any]:
         palabras_reclamo = self.extraer_palabras_clave(contenido)
         contadores = {depto: 0 for depto in self.keywords_por_depto}
-        
+        # Contamos coincidencias por departamento
         for p in palabras_reclamo:
             for depto, keywords in self.keywords_por_depto.items():
                 if p in keywords:
                     contadores[depto] += 1
-        
+        # Determinamos el departamento con más coincidencias
         max_v = max(contadores.values())
         if max_v == 0:
             return {"departamento_id": "D_SECRETARIA"}
-            
+            # Si no hay coincidencias, asignamos por defecto a Secretaría
         ganadores = [d for d, v in contadores.items() if v == max_v]
         return {"departamento_id": ganadores[0]}
 
-    # En tu clase Clasificador
-    def buscar_similares(self, contenido, historial_reclamos): # Ahora acepta 3 (self + 2)
+    def buscar_similares(self, contenido, historial_reclamos):
         palabras_nuevo = set(self.extraer_palabras_clave(contenido))
         similares_ids = []
-        
+        # Buscamos reclamos con al menos 2 palabras clave en común
         for rid, rec in historial_reclamos.items():
             palabras_viejo = set(self.extraer_palabras_clave(rec.contenido))
             if len(palabras_nuevo.intersection(palabras_viejo)) >= 2:
                 similares_ids.append(rid)
-        return similares_ids
+        return similares_ids # Retornamos los IDs de reclamos similares
