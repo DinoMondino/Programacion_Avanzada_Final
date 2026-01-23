@@ -7,13 +7,11 @@ class Gestor_Reclamos:
         self.db = db
         self.clasificador_servicio = clasificador_servicio
 
-    # --- MÉTODOS DE BÚSQUEDA (LECTURA) ---
-
-    def get_reclamo(self, reclamo_id: int) -> Optional[Reclamo]:
-        """Busca un reclamo por su ID numérico."""
+    # --- MÉTODOS DE BÚSQUEDA ---
+    def get_reclamo(self, reclamo_id: int) -> Optional[Reclamo]: # Optional porque puede no existir
         return Reclamo.query.get(reclamo_id)
 
-    def obtener_todos_los_reclamos(self) -> List[Reclamo]:
+    def obtener_todos_los_reclamos(self) -> List[Reclamo]: # List porque retorna varios
         """Retorna la lista completa de reclamos (Para el Secretario)."""
         return Reclamo.query.all()
 
@@ -22,10 +20,7 @@ class Gestor_Reclamos:
         return Reclamo.query.filter_by(departamento_id=depto_id).all()
 
     def obtener_reclamos_para_usuario(self, usuario: Usuario) -> List[Reclamo]:
-        """
-        MÉTODO CENTRALIZADO (Refactorización de SecretarioTecnico):
-        Decide qué reclamos mostrar según el rol del objeto usuario.
-        """
+        # Decide qué reclamos mostrar según el rol del objeto usuario.
         if usuario.rol_admin == RolAdmin.SECRETARIO:
             return self.obtener_todos_los_reclamos()
         
@@ -36,17 +31,11 @@ class Gestor_Reclamos:
         return Reclamo.query.filter_by(usuario_id=usuario.id).all()
 
 
-    # --- MÉTODOS DE ACCIÓN (ESCRITURA) ---
-
+    # --- MÉTODOS DE ESCRITURA ---
     def crear_reclamo(self, contenido: str, adjunto: Optional[str], usuario_id: int) -> Dict[str, Any]:
-        """Crea un reclamo con clasificación automática y persistencia."""
-        
-        # Clasificación automática
+        # Clasificación automática segun palabras clave
         resultado_clasif = self.clasificador_servicio.clasificar(contenido)
         depto_id = resultado_clasif['departamento_id']
-        
-        # ELIMINAMOS O COMENTAMOS la lógica de adhesión automática que tenías aquí
-        # para que el control pase al usuario en el frontend.
 
         nuevo_reclamo = Reclamo(
             contenido=contenido,
@@ -55,13 +44,13 @@ class Gestor_Reclamos:
             departamento_id=depto_id,
             estado=EstadoReclamo.PENDIENTE.value
         )
-        
+    
         self.db.session.add(nuevo_reclamo)
-        self.db.session.commit()
+        self.db.session.commit() # Confirma los cambios en la base de datos
         return {"status": "creado", "reclamo_id": nuevo_reclamo.id}
 
-    def gestionar_estado_reclamo(self, reclamo_id: int, nuevo_estado: str) -> bool:
-        """Cambia el estado del reclamo (Responsabilidad del Gestor, no del Secretario)."""
+    def gestionar_estado_reclamo(self, reclamo_id: int, nuevo_estado: str) -> bool: # bool indica si se pudo cambiar
+        # Cambia el estado del reclamo (Responsabilidad del Gestor, no del Secretario).
         reclamo = self.get_reclamo(reclamo_id)
         if reclamo:
             # Validamos que el estado sea un valor del Enum
@@ -72,7 +61,7 @@ class Gestor_Reclamos:
         return False
 
     def derivar_reclamo(self, reclamo_id: int, nuevo_depto_id: str) -> bool:
-        """Permite corregir el departamento asignado (Lógica administrativa)."""
+        # Permite corregir el departamento asignado.
         reclamo = self.get_reclamo(reclamo_id)
         if reclamo:
             reclamo.departamento_id = nuevo_depto_id
@@ -81,13 +70,13 @@ class Gestor_Reclamos:
         return False
         
     def adherirse_a_reclamo(self, reclamo_id: int, usuario_id: int) -> bool:
-        """Agrega un usuario a la lista de seguidores de un reclamo."""
+        # Agrega un usuario a la lista de seguidores de un reclamo.
         reclamo = self.get_reclamo(reclamo_id)
         usuario = Usuario.query.get(usuario_id)
         
         if reclamo and usuario:
             if reclamo.usuario_id == usuario_id or usuario in reclamo.seguidores:
-                return False
+                return False # No puede adherirse a su propio reclamo o si ya está adherido
                 
             reclamo.seguidores.append(usuario)
             self.db.session.commit()

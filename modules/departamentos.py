@@ -3,42 +3,18 @@ from collections import Counter
 import datetime
 from .reclamos import EstadoReclamo
 
+# Para el análisis y generación de estadísticas
 class Analitica:
     def __init__(self, gestor_servicio):
-        self._gestor = gestor_servicio
-        self.stopwords = gestor_servicio.clasificador_servicio.stopwords
-
-    def get_estadisticas_generales(self, depto_id: str) -> Dict[str, Any]:
-        reclamos = self._gestor.get_reclamos_por_departamento(depto_id)
-        total = len(reclamos)
-        if total == 0:
-            return {"total_reclamos": 0, "resueltos": 0, "pendientes": 0, "resueltos_porcentaje": 0}
-        
-        resueltos = len([r for r in reclamos if r.estado == EstadoReclamo.RESUELTO])
-        return {
-            "total_reclamos": total,
-            "resueltos": resueltos,
-            "pendientes": total - resueltos,
-            "resueltos_porcentaje": (resueltos / total) * 100
-        }
-
-    def get_frecuencia_palabras(self, depto_id: str) -> Dict[str, int]:
-        reclamos = self._gestor.get_reclamos_por_departamento(depto_id)
-        todo_el_texto = " ".join([r.contenido for r in reclamos])
-        palabras = [p for p in todo_el_texto.lower().split() if len(p) > 3]
-        return dict(Counter(palabras))
-    
-    # modules/departamentos.py
+        self._gestor = gestor_servicio # Reutilizamos el gestor de reclamos
+        self.stopwords = gestor_servicio.clasificador_servicio.stopwords # Reutilizamos las stopwords del clasificador
 
     def obtener_datos_dashboard(self, depto_id: str) -> Dict[str, Any]:
         from .reclamos import Reclamo # Importación local para evitar importes circulares
-        
-        # Si depto_id es None (Secretario Técnico), traemos todos. 
-        # Si tiene ID (Jefe), filtramos por su departamento.
+        # Filtramos por dpto, si es None --> Secretario Técnico, si tiene ID --> Jefe, filtramos por su departamento.
         query = Reclamo.query
         if depto_id:
             query = query.filter_by(departamento_id=depto_id)
-        
         reclamos = query.all()
         
         # Contamos cada estado
@@ -46,7 +22,7 @@ class Analitica:
         en_proceso = len([r for r in reclamos if r.estado == "en_proceso"])
         resueltos = len([r for r in reclamos if r.estado == "resuelto"])
         
-        # Procesar palabras clave para la nube
+        # Procesamos las palabras clave para la nube
         texto_total = " ".join([r.contenido for r in reclamos])
         palabras = [p.lower().strip('.,') for p in texto_total.split() if len(p) > 3]
         frecuencia = {}
@@ -62,7 +38,7 @@ class Analitica:
                 "total": len(reclamos)
             },
             "frecuencia": dict(sorted(frecuencia.items(), key=lambda x: x[1], reverse=True)[:15])
-        }
+        } # Retornamos solo las 15 palabras más comunes
         
     def generar_reporte_html(self, depto_id: str, stats: dict = None, frecuencia: dict = None) -> str:
         # Genera una versión HTML simplificada para impresión/reporte.
