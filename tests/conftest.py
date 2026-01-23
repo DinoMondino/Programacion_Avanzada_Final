@@ -6,19 +6,15 @@ from modules.usuarios import db
 
 @pytest.fixture
 def app():
-    # Configuración para la app de prueba
-    flask_app.config.update({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:", # Base de datos en memoria RAM, se borra automaticamente
-        "SQLALCHEMY_TRACK_MODIFICATIONS": False, # Desactiva el seguimiento de modificaciones para ahorrar recursos
-        "WTF_CSRF_ENABLED": False  # Desactiva los tokens de seguridad (CSRF) de los formularios.
-    })
-
+    # Seteamos TESTING antes de cualquier otra cosa
+    flask_app.config['TESTING'] = True
+    flask_app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///:memory:"
+    
     with flask_app.app_context():
-        db.create_all()
+        db.create_all() # Crea tablas en memoria
         yield flask_app
         db.session.remove()
-        db.drop_all()
+        db.drop_all() # Borra tablas en memoria
 
 @pytest.fixture
 def client(app):

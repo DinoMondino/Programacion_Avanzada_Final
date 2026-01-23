@@ -1,6 +1,7 @@
 import os
 import io
 import csv
+import sys
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
 from functools import wraps
 from werkzeug.utils import secure_filename
@@ -14,10 +15,15 @@ from modules.departamentos import Analitica
 app = Flask(__name__)
 app.secret_key = 'super_secreto_uner'
 
-# Configuración de base de datos
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Configuración de base de datos
+if 'pytest' in sys.modules or 'pytest' in sys.argv[0]:
+    app.config['TESTING'] = True
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+    print(">>> MODO TEST DETECTADO: Usando base de datos en RAM.")
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+    print(">>> MODO PRODUCCIÓN: Usando database.db físico.")
 
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER

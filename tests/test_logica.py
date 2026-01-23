@@ -4,20 +4,15 @@ from modules.usuarios import Usuario
 from app import db
 
 def test_clasificacion_y_adhesion(app, gestor_servicio):
-    """
-    Testea RF 116 (Clasificación automática) 
-    y la posibilidad de adherirse manualmente (RF 117).
-    """
+    # Testea la clasificación automática y la posibilidad de adherirse manualmente.
     with app.app_context():
-        # 1. Configuración: Crear dos usuarios
-        # u1 será el autor, u2 será el que se adhiere
+        # 1. Crea dos usuarios, u1 será el autor, u2 será el que se adhiere
         u1 = Usuario(username="autor", password="123")
         u2 = Usuario(username="vecino", password="123")
         db.session.add_all([u1, u2])
         db.session.commit()
 
-        # 2. Testear RF 116: Clasificación automática
-        # El gestor debe devolver "creado" y asignar D_INFORMATICA por la palabra 'wifi'
+        # 2. El gestor debe devolver "creado" y asignar D_INFORMATICA por la palabra 'wifi'
         res1 = gestor_servicio.crear_reclamo(
             "No funciona el wifi, en el aula de programación no hay internet", 
             None, 
@@ -32,18 +27,18 @@ def test_clasificacion_y_adhesion(app, gestor_servicio):
         assert rec1.estado == EstadoReclamo.PENDIENTE.value
         assert rec1.usuario_id == u1.id
 
-        # 3. Testear creación de un segundo reclamo similar
-        # Según tu lógica, el sistema crea uno nuevo y el frontend decidiría qué hacer.
-        res2 = gestor_servicio.crear_reclamo(
-            "No funciona el wifi, el internet va lento", 
-            None, 
-            u1.id
-        )
-        assert res2["status"] == "creado"
-        assert res2["reclamo_id"] != id_reclamo # Son IDs distintos
+        # 3. Simulamos un nuevo contenido que es semánticamente igual al primero
+        contenido_parecido = "El wifi del aula de programación no funciona, no tengo internet"
+        historial = {r.id: r for r in Reclamo.query.all()}
 
-        # 4. Testear RF 117: Adhesión manual
-        # Probamos que el usuario 2 pueda adherirse al primer reclamo
+        # Le preguntamos al clasificador si encuentra algo parecido
+        similares_detectados = gestor_servicio.clasificador_servicio.buscar_similares(contenido_parecido, historial)
+
+        # El sistema debe haber encontrado al menos un reclamo similar con ID igual al del primer reclamo.
+        assert len(similares_detectados) > 0
+        assert similares_detectados[0] == id_reclamo
+
+        # 4. Probamos que el usuario 2 pueda adherirse al primer reclamo
         exito_adhesion = gestor_servicio.adherirse_a_reclamo(id_reclamo, u2.id)
         assert exito_adhesion is True
         
@@ -51,18 +46,17 @@ def test_clasificacion_y_adhesion(app, gestor_servicio):
         reclamo_actualizado = Reclamo.query.get(id_reclamo)
         assert u2 in reclamo_actualizado.seguidores
         
-        # 5. Testear restricciones de adhesión
-        # No debería permitir que el autor se adhiera a su propio reclamo
+        # 5. No debería permitir que el autor se adhiera a su propio reclamo
         reintento_autor = gestor_servicio.adherirse_a_reclamo(id_reclamo, u1.id)
         assert reintento_autor is False
 
 def test_gestion_estados_y_derivacion(app, gestor_servicio):
-    """Testea el cambio de estados y la derivación manual de departamentos."""
+    # Testea el cambio de estados y la derivación manual de departamentos.
     with app.app_context():
-        u = Usuario(username="admin_test", password="123")
+        u = Usuario(username="admin_test", password="123") # Creamos un usuario Secretario
         db.session.add(u)
         db.session.commit()
-        
+        # Creamos un reclamo inicial que se clasifica por defecto en el departamento secretaria
         res = gestor_servicio.crear_reclamo("Caño roto en patio", None, u.id)
         rec_id = res["reclamo_id"]
         
