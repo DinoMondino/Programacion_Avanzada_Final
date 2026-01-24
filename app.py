@@ -223,6 +223,46 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
         
+def inicializar_sistema():
+    """
+    Crea los usuarios de gestión automáticamente.
+    Cumple con el requerimiento de alta a nivel de sistema y fácil incorporación.
+    """
+    # 1. Crear Secretario Técnico (si no existe)
+    if not Usuario.query.filter_by(rol_admin='SECRETARIO').first():
+        sec = Usuario(
+            username='secretario', 
+            password='123', 
+            rol_admin='SECRETARIO', 
+            nombre='Admin', 
+            apellido='General'
+        )
+        db.session.add(sec)
+
+    # 2. Crear Jefes de Departamento
+    # Para agregar un dpto nuevo, solo añades un elemento a esta lista.
+    jefes_a_crear = [
+        {'user': 'jefe_informatica', 'dept': 'D_INFORMATICA', 'nom': 'Juan'},
+        {'user': 'jefe_mantenimiento', 'dept': 'D_MANTENIMIENTO', 'nom': 'Pedro'},
+        {'user': 'jefe_bio', 'dept': 'D_BIOIMAGENES', 'nom': 'Ana'} # Ejemplo de crecimiento
+    ]
+
+    for datos in jefes_a_crear:
+        if not Usuario.query.filter_by(username=datos['user']).first():
+            jefe = Usuario(
+                username=datos['user'],
+                password='123',
+                rol_admin='JEFE',
+                departamento_id=datos['dept'],
+                nombre=datos['nom'],
+                apellido='Jefe'
+            )
+            db.session.add(jefe)
+    
+    db.session.commit()
+    print(">>> Usuarios de gestión inicializados correctamente.")
+
+
 if __name__ == '__main__':
     with app.app_context(): # Asegura que tengamos la databese para la app
         # 1. Crea las tablas. Si ya existen, no toca los datos que hay adentro.
