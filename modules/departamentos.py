@@ -3,6 +3,7 @@ from collections import Counter
 import datetime
 import heapq
 from .reclamos import Reclamo, EstadoReclamo
+from abc import ABC, abstractmethod
 
 # Para el análisis y generación de estadísticas
 class Analitica:
@@ -46,75 +47,104 @@ class Analitica:
         
     def obtener_estadisticas(self, reclamos: List[Reclamo]):
         """
-        Genera el diccionario de estadísticas para el Dashboard.
+        Genera las estadísticas incluyendo la mediana eficiente (Heaps). 
         """
+        # Extraemos los tiempos para los dos grupos requeridos
         tiempos_en_proceso = [r.tiempo_estimado for r in reclamos 
                               if r.estado == EstadoReclamo.EN_PROCESO.value and r.tiempo_estimado]
         
         tiempos_resueltos = [r.tiempo_resolucion for r in reclamos 
                             if r.estado == EstadoReclamo.RESUELTO.value and r.tiempo_resolucion]
 
+        # Calculamos porcentajes para el diagrama circular 
+        total = len(reclamos) if reclamos else 1
+        pendientes = len([r for r in reclamos if r.estado == EstadoReclamo.PENDIENTE.value])
+        en_p = len([r for r in reclamos if r.estado == EstadoReclamo.EN_PROCESO.value])
+        res = len([r for r in reclamos if r.estado == EstadoReclamo.RESUELTO.value])
+
         return {
-            "total": len(reclamos),
-            "mediana_en_proceso": self.calcular_mediana_eficiente(tiempos_en_proceso),
-            "mediana_resueltos": self.calcular_mediana_eficiente(tiempos_resueltos),
-            # Aquí irían los porcentajes para el gráfico circular [cite: 54, 133]
+            "total_reclamos": len(reclamos),
+            "porcentajes": {
+                "pendiente": (pendientes / total) * 100,
+                "en_proceso": (en_p / total) * 100,
+                "resuelto": (res / total) * 100
+            },
+            # REQUERIMIENTO 2024: Medianas calculadas con montículos 
+            "mediana_en_proceso": self.calcular_mediana(tiempos_en_proceso),
+            "mediana_resueltos": self.calcular_mediana(tiempos_resueltos)
         }
 
     def obtener_datos_dashboard(self, depto_id: str) -> Dict[str, Any]:
-        from .reclamos import Reclamo # Importación local para evitar importes circulares
-        # Filtramos por dpto, si es None --> Secretario Técnico, si tiene ID --> Jefe, filtramos por su departamento.
+        from .reclamos import Reclamo, EstadoReclamo
+        
         query = Reclamo.query
         if depto_id:
             query = query.filter_by(departamento_id=depto_id)
         reclamos = query.all()
         
-        # Contamos cada estado
-        pendientes = len([r for r in reclamos if r.estado == "pendiente"])
-        en_proceso = len([r for r in reclamos if r.estado == "en_proceso"])
-        resueltos = len([r for r in reclamos if r.estado == "resuelto"])
+        # 1. Contadores de estado (usando Enum para mayor seguridad)
+        pendientes = [r for r in reclamos if r.estado == EstadoReclamo.PENDIENTE.value]
+        en_proceso = [r for r in reclamos if r.estado == EstadoReclamo.EN_PROCESO.value]
+        resueltos = [r for r in reclamos if r.estado == EstadoReclamo.RESUELTO.value]
         
-        # Procesamos las palabras clave para la nube
+        # 2. REQUERIMIENTO 2024: Preparar listas para la MEDIANA
+        # Extraemos solo los valores numéricos
+        tiempos_en_p = [r.tiempo_estimado for r in en_proceso if r.tiempo_estimado is not None]
+        tiempos_res = [r.tiempo_resolucion for r in resueltos if r.tiempo_resolucion is not None]
+
+        # 3. Procesamos las palabras clave (tu lógica original)
         texto_total = " ".join([r.contenido for r in reclamos])
-        palabras = [p.lower().strip('.,') for p in texto_total.split() if len(p) > 3]
+        palabras = [p.lower().strip('.,;!?') for p in texto_total.split() if len(p) > 3]
         frecuencia = {}
         for p in palabras:
             if p not in self.stopwords:
                 frecuencia[p] = frecuencia.get(p, 0) + 1
         
+        # 4. Retorno con todos los datos para el Dashboard y Reportes
         return {
             "stats": {
-                "pendientes": pendientes,
-                "en_proceso": en_proceso,
-                "resueltos": resueltos,
-                "total": len(reclamos)
+                "pendientes": len(pendientes),
+                "en_proceso": len(en_proceso),
+                "resueltos": len(resueltos),
+                "total": len(reclamos),
+                # REQUERIMIENTO 2024: Aquí usamos el algoritmo de montículos
+                "mediana_en_proceso": self.calcular_mediana(tiempos_en_p),
+                "mediana_resueltos": self.calcular_mediana(tiempos_res)
             },
             "frecuencia": dict(sorted(frecuencia.items(), key=lambda x: x[1], reverse=True)[:15])
-        } # Retornamos solo las 15 palabras más comunes
-        
-    def generar_reporte_html(self, depto_id: str, stats: dict = None, frecuencia: dict = None) -> str:
-        # Genera una versión HTML simplificada para impresión/reporte.
-        datos = self.obtener_datos_dashboard(depto_id)
+        }
+
+# --- INTERFAZ ESTRATEGIA ---
+class EstrategiaReporte(ABC):
+    @abstractmethod
+    def exportar(self, titulo: str, datos: dict) -> str:
+        pass
+
+# --- ESTRATEGIA HTML ---
+class ReporteHTML(EstrategiaReporte):
+    def exportar(self, titulo: str, datos: dict) -> str:
         fecha = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-        titulo = f"Reporte de Gestión - {depto_id if depto_id else 'General'}"
-        
         html = f"""
         <html>
-        <head><title>{titulo}</title></head>
-        <body style="font-family: sans-serif; padding: 20px;">
-            <h1>{titulo}</h1>
-            <p>Fecha de emisión: {fecha}</p>
-            <hr>
-            <h3>Resumen de Estados:</h3>
-            <ul>
-                <li>Pendientes: {datos['stats']['pendientes']}</li>
-                <li>En Proceso: {datos['stats']['en_proceso']}</li>
-                <li>Resueltos: {datos['stats']['resueltos']}</li>
-                <li><b>Total: {datos['stats']['total']}</b></li>
-            </ul>
-            <h3>Palabras Clave Detectadas:</h3>
-            <p>{", ".join(datos['frecuencia'].keys())}</p>
-        </body>
+            <body style="font-family: Arial;">
+                <h1>{titulo}</h1>
+                <p>Generado el: {fecha}</p>
+                <hr>
+                <h3>Estadísticas:</h3>
+                <ul>
+                    <li>Pendientes: {datos['stats']['pendientes']}</li>
+                    <li>Mediana En Proceso: {datos['stats']['mediana_en_proceso']} días</li>
+                    <li>Mediana Resueltos: {datos['stats']['mediana_resueltos']} días</li>
+                </ul>
+            </body>
         </html>
         """
         return html
+
+# --- ESTRATEGIA PDF (Simulada o con xhtml2pdf) ---
+class ReportePDF(EstrategiaReporte):
+    def exportar(self, titulo: str, datos: dict) -> str:
+        # Aquí se usaría una librería como xhtml2pdf para convertir el HTML a PDF binary
+        html_content = ReporteHTML().exportar(titulo, datos)
+        print(f"Transformando reporte '{titulo}' a formato PDF...")
+        return html_content # En una implementación real, retornaría el PDF binario
