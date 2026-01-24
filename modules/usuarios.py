@@ -10,9 +10,10 @@ class Claustro(Enum):
     PAYS = "PAyS"
 
 class RolAdmin(Enum):
-    NINGUNO = "Ninguno"
-    JEFE = "Jefe de Departamento"
-    SECRETARIO = "Secretario Técnico"
+    FINAL = "FINAL"
+    JEFE = "JEFE"
+    SECRETARIO = "SECRETARIO"
+    NINGUNO = "NINGUNO"
 
 # Clase Base. Al heredar db.Model, SQLAlchemy sabe que esta clase se debe transformar en una tabla de base de datos.
 class Usuario(db.Model):

@@ -5,7 +5,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from functools import wraps
 
 # Importaciones de tus módulos
-from modules.usuarios import db, Usuario
+from modules.usuarios import db, Usuario, RolAdmin
 from modules.reclamos import Reclamo, Clasificador, EstadoReclamo
 from modules.gestor import Gestor_Reclamos
 from modules.departamentos import Analitica, ReporteHTML, ReportePDF
@@ -58,11 +58,38 @@ def login():
         user = Usuario.query.filter_by(username=request.form['username']).first()
         if user and user.password == request.form['password']:
             session['user_id'] = user.id
-            session['rol'] = user.rol_admin
+            session['rol'] = user.rol_admin.value
             session['depto'] = user.departamento_id
             return redirect(url_for('dashboard'))
         flash("Credenciales incorrectas", "danger")
-    return render_template('login.html')
+    return render_template('index.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        # Lógica para crear el usuario
+        username = request.form.get('username')
+        password = request.form.get('password')
+        nombre = request.form.get('nombre')
+        apellido = request.form.get('apellido')
+        
+        if Usuario.query.filter_by(username=username).first():
+            flash("El usuario ya existe", "danger")
+        else:
+            # Por defecto los registros web son rol FINAL
+            nuevo_usuario = Usuario(
+                username=username, 
+                password=password, 
+                rol_admin='FINAL',
+                nombre=nombre,
+                apellido=apellido
+            )
+            db.session.add(nuevo_usuario)
+            db.session.commit()
+            flash("Cuenta creada. Ya puedes iniciar sesión.", "success")
+            return redirect(url_for('login'))
+            
+    return render_template('register.html')
 
 @app.route('/logout')
 def logout():
@@ -76,14 +103,21 @@ def dashboard():
     usuario = Usuario.query.get(session['user_id'])
     
     # Si es Jefe o Secretario, va al panel de Analítica
-    if usuario.rol_admin in ['JEFE', 'SECRETARIO']:
+    if usuario.rol_admin.value in ['JEFE', 'SECRETARIO']:
         datos_dash = analitica.obtener_datos_dashboard(usuario.departamento_id)
-        return render_template('admin_dashboard.html', user=usuario, datos=datos_dash)
+        if usuario.departamento_id == 1:
+            lista_para_tabla = Reclamo.query.all()
+        else:
+            lista_para_tabla = Reclamo.query.filter_by(departamento_id=usuario.departamento_id).all()
+        return render_template('admin_dashboard.html', 
+                           user=usuario, 
+                           datos=datos_dash, 
+                           reclamos=lista_para_tabla)
     
     # Si es usuario final, ve sus reclamos y los globales para adherirse
     mis_reclamos = Reclamo.query.filter_by(usuario_id=usuario.id).all()
     otros_reclamos = Reclamo.query.filter(Reclamo.usuario_id != usuario.id).all()
-    return render_template('dashboard.html', user=usuario, reclamos=mis_reclamos, otros=otros_reclamos)
+    return render_template('user_dashboard.html', user=usuario, reclamos=mis_reclamos, otros=otros_reclamos)
 
 @app.route('/crear_reclamo', methods=['GET', 'POST'])
 @login_required
@@ -168,46 +202,74 @@ def generar_reporte(formato):
 
 # 7. INICIALIZACIÓN DATA-DRIVEN DESDE ARCHIVO
 def inicializar_desde_archivo():
-    archivo_ruta = 'semillas.json'
-    if not os.path.exists(archivo_ruta):
-        return
+    with app.app_context():
+        # 1. Limpieza preventiva (opcional para pruebas)
+        # db.drop_all() 
+        # db.create_all()
 
-    with open(archivo_ruta, 'r', encoding='utf-8') as f:
-        datos = json.load(f)
+        if not os.path.exists('semillas.json'):
+            return
 
-    # Crear Usuarios de Gestión y Finales
-    for u in datos.get('usuarios_gestion', []) + datos.get('usuarios_finales', []):
-        if not Usuario.query.filter_by(username=u['username']).first():
-            rol = u.get('rol', 'FINAL')
-            nuevo = Usuario(username=u['username'], password=u.get('password', '123'),
-                            rol_admin=rol, departamento_id=u.get('depto'),
-                            nombre=u['nombre'], apellido=u['apellido'])
-            db.session.add(nuevo)
-    db.session.commit()
+        with open('semillas.json', 'r', encoding='utf-8') as f:
+            datos = json.load(f)
 
-    # Cargar Reclamos y Adhesiones si la base está limpia
-    if Reclamo.query.count() == 0:
-        usuarios_f = Usuario.query.filter_by(rol_admin='FINAL').all()
-        mapa_reclamos = {}
+        # 2. Carga de Usuarios
+        for u in datos.get('usuarios_gestion', []) + datos.get('usuarios_finales', []):
+            if not Usuario.query.filter_by(username=u['username']).first():
+                # Forzamos el valor del enum desde el string del JSON
+                nuevo = Usuario(
+                    username=u['username'],
+                    password=u.get('password', '123'),
+                    rol_admin=u.get('rol', 'FINAL'), 
+                    departamento_id=u.get('depto'),
+                    nombre=u['nombre'],
+                    apellido=u['apellido']
+                )
+                db.session.add(nuevo)
         
-        for r in datos.get('reclamos_iniciales', []):
-            autor = usuarios_f[r['user_idx']]
-            nuevo_rec = Reclamo(contenido=r['contenido'], usuario_id=autor.id,
-                                estado=r['estado'], departamento_id=r.get('depto'),
-                                tiempo_estimado=r.get('tiempo_estimado'))
-            db.session.add(nuevo_rec)
-            db.session.flush()
-            mapa_reclamos[r['id_temp']] = nuevo_rec
+        db.session.commit() # GUARDAMOS PRIMERO
+        print(">>> Usuarios guardados correctamente.")
 
-        for adh in datos.get('adhesiones_iniciales', []):
-            rec = mapa_reclamos.get(adh['reclamo_id_temp'])
-            if rec:
-                for idx in adh['user_indices']:
-                    usuario_que_apoya = usuarios_f[idx]
-                    if usuario_que_apoya not in rec.seguidores:
-                        rec.seguidores.append(usuario_que_apoya)
-        db.session.commit()
-    print(">>> Base de Datos inicializada con éxito.")
+        # 3. Carga de Reclamos
+        if Reclamo.query.count() == 0:
+            # Buscamos los usuarios finales que acabamos de crear
+            todos = Usuario.query.all()
+            usuarios_f = [u for u in todos if "FINAL" in str(u.rol_admin)]
+            
+            print(f">>> Usuarios finales detectados para asignar: {len(usuarios_f)}")
+            
+            if len(usuarios_f) == 0:
+                print(">>> ERROR: No hay usuarios finales para asignar reclamos.")
+                return
+
+            mapa_reclamos = {}
+            for r in datos.get('reclamos_iniciales', []):
+                idx = r['user_idx']
+                if idx < len(usuarios_f):
+                    autor = usuarios_f[idx]
+                    nuevo_rec = Reclamo(
+                        contenido=r['contenido'], 
+                        usuario_id=autor.id,
+                        estado=r['estado'], 
+                        departamento_id=r.get('depto'),
+                        tiempo_estimado=r.get('tiempo_estimado')
+                    )
+                    db.session.add(nuevo_rec)
+                    db.session.flush()
+                    mapa_reclamos[r['id_temp']] = nuevo_rec
+                else:
+                    print(f">>> Advertencia: user_idx {idx} fuera de rango.")
+
+            # 4. Adhesiones
+            for adh in datos.get('adhesiones_iniciales', []):
+                rec = mapa_reclamos.get(adh['reclamo_id_temp'])
+                if rec:
+                    for u_idx in adh['user_indices']:
+                        if u_idx < len(usuarios_f):
+                            rec.seguidores.append(usuarios_f[u_idx])
+            
+            db.session.commit()
+            print(">>> Reclamos y Adhesiones cargados con éxito.")
 
 if __name__ == '__main__':
     with app.app_context():

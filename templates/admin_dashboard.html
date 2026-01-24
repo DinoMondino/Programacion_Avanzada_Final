@@ -8,7 +8,7 @@
                 <i class="bi bi-question-circle"></i> Ayuda
             </button>
             <h1 class="mb-0">
-                <i class="bi bi-shield-lock"></i> Panel de {{ user.rol_admin }}
+                <i class=></i> Panel de {{ user.rol_admin }}
                 {% if user.departamento_id %}
                     - {{ user.departamento_id.replace('D_', '') }}
                 {% endif %}
@@ -129,7 +129,7 @@
                                 </td>
 
                                 <td>
-                                    {% if user.rol_admin == 'SECRETARIO' %}
+                                    {% if user.rol_admin.value == 'SECRETARIO' %}
                                     <form action="{{ url_for('derivar_reclamo', id_reclamo=rec.id) }}" method="post" class="d-flex gap-1">
                                         <select name="nuevo_depto" class="form-select form-select-sm border-primary">
                                             <option value="" disabled selected>Derivar a...</option>
