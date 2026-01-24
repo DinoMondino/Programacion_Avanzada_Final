@@ -5,6 +5,41 @@ import heapq
 from .reclamos import Reclamo, EstadoReclamo
 from abc import ABC, abstractmethod
 
+# --- INTERFAZ ESTRATEGIA ---
+class EstrategiaReporte(ABC):
+    @abstractmethod
+    def exportar(self, titulo: str, datos: dict) -> str:
+        pass
+
+# --- ESTRATEGIA HTML ---
+class ReporteHTML(EstrategiaReporte):
+    def exportar(self, titulo: str, datos: dict) -> str:
+        fecha = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+        html = f"""
+        <html>
+            <body style="font-family: Arial;">
+                <h1>{titulo}</h1>
+                <p>Generado el: {fecha}</p>
+                <hr>
+                <h3>Estadísticas:</h3>
+                <ul>
+                    <li>Pendientes: {datos['stats']['pendientes']}</li>
+                    <li>Mediana En Proceso: {datos['stats']['mediana_en_proceso']} días</li>
+                    <li>Mediana Resueltos: {datos['stats']['mediana_resueltos']} días</li>
+                </ul>
+            </body>
+        </html>
+        """
+        return html
+
+# --- ESTRATEGIA PDF (Simulada o con xhtml2pdf) ---
+class ReportePDF(EstrategiaReporte):
+    def exportar(self, titulo: str, datos: dict) -> str:
+        # Aquí se usaría una librería como xhtml2pdf para convertir el HTML a PDF binary
+        html_content = ReporteHTML().exportar(titulo, datos)
+        print(f"Transformando reporte '{titulo}' a formato PDF...")
+        return html_content # En una implementación real, retornaría el PDF binario
+
 # Para el análisis y generación de estadísticas
 class Analitica:
     def __init__(self, gestor_servicio):
@@ -113,38 +148,13 @@ class Analitica:
             },
             "frecuencia": dict(sorted(frecuencia.items(), key=lambda x: x[1], reverse=True)[:15])
         }
-
-# --- INTERFAZ ESTRATEGIA ---
-class EstrategiaReporte(ABC):
-    @abstractmethod
-    def exportar(self, titulo: str, datos: dict) -> str:
-        pass
-
-# --- ESTRATEGIA HTML ---
-class ReporteHTML(EstrategiaReporte):
-    def exportar(self, titulo: str, datos: dict) -> str:
-        fecha = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-        html = f"""
-        <html>
-            <body style="font-family: Arial;">
-                <h1>{titulo}</h1>
-                <p>Generado el: {fecha}</p>
-                <hr>
-                <h3>Estadísticas:</h3>
-                <ul>
-                    <li>Pendientes: {datos['stats']['pendientes']}</li>
-                    <li>Mediana En Proceso: {datos['stats']['mediana_en_proceso']} días</li>
-                    <li>Mediana Resueltos: {datos['stats']['mediana_resueltos']} días</li>
-                </ul>
-            </body>
-        </html>
+    def generar_reporte(self, depto_id: str, estrategia: EstrategiaReporte):
         """
-        return html
-
-# --- ESTRATEGIA PDF (Simulada o con xhtml2pdf) ---
-class ReportePDF(EstrategiaReporte):
-    def exportar(self, titulo: str, datos: dict) -> str:
-        # Aquí se usaría una librería como xhtml2pdf para convertir el HTML a PDF binary
-        html_content = ReporteHTML().exportar(titulo, datos)
-        print(f"Transformando reporte '{titulo}' a formato PDF...")
-        return html_content # En una implementación real, retornaría el PDF binario
+        Método unificado que utiliza el Patrón Strategy.
+        Cumple con el requerimiento de añadir nuevos formatos de forma confiable.
+        """
+        datos = self.obtener_datos_dashboard(depto_id)
+        titulo = f"Reporte de Gestión - {depto_id if depto_id else 'General'}"
+        
+        # Delegamos la responsabilidad a la estrategia elegida
+        return estrategia.exportar(titulo, datos)

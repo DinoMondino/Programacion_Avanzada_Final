@@ -194,40 +194,18 @@ def adherirse(id_reclamo):
 
     return redirect(url_for('dashboard'))
 
-# Descargar reporte CSV
-@app.route('/descargar_reporte')
-@login_required
-def descargar_reporte():
-    user = Usuario.query.get(session['user_id']) # Usuario actual
-    if user.tipo_usuario == 'secretario': # Si es secretario, obtiene todos los reclamos
-        reclamos = Reclamo.query.all()
-    else:
-        reclamos = Reclamo.query.filter_by(departamento_id=user.departamento_id).all() # Si no, solo los de su depto
-
-    output = io.StringIO() # Flujo en memoria
-    writer = csv.writer(output, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-    writer.writerow(['ID', 'Fecha', 'Usuario', 'Departamento', 'Contenido', 'Estado', 'Apoyos'])
+# Descargar reporte
+@app.route('/descargar_reporte/<formato>')
+def descargar_reporte(formato):
+    depto_id = session.get('departamento_id') # Solo para Jefes
     
-    for r in reclamos:
-        cant_apoyos = len(r.seguidores) if hasattr(r, 'seguidores') and r.seguidores else 0
-        nombre_autor = r.autor.nombre if hasattr(r, 'autor') and r.autor else "Anónimo"
+    if formato == 'pdf':
+        estrategia = ReportePDF()
+    else:
+        estrategia = ReporteHTML()
         
-        writer.writerow([
-            r.id,
-            r.fecha_creacion.strftime('%d/%m/%Y %H:%M') if r.fecha_creacion else '-',
-            nombre_autor,
-            r.departamento_id,
-            r.contenido.replace('\n', ' ').replace('\r', ' '),
-            r.estado.upper() if isinstance(r.estado, str) else str(r.estado),
-            cant_apoyos
-        ]) # Escribimos una fila por reclamo
-
-    output.seek(0) # Esto sirve para que la lectura del flujo comience desde el inicio
-    return Response(
-        output.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-disposition": f"attachment; filename=reporte.csv"}
-    )
+    contenido = analitica.generar_reporte(depto_id, estrategia)
+    return contenido # Envía el reporte generado
 
 # Derivar reclamo a otro departamento
 @app.route('/admin/derivar', methods=['POST'])
