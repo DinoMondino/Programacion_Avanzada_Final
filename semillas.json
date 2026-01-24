@@ -1,0 +1,68 @@
+{
+  "config_institucion": {
+    "departamentos": [
+      {"id": "D_INFORMATICA", "nombre": "Departamento de Informática"},
+      {"id": "D_MANTENIMIENTO", "nombre": "Departamento de Mantenimiento"},
+      {"id": "D_BIBLIOTECA", "nombre": "Biblioteca y Recursos"}
+    ]
+  },
+  "usuarios_finales": [
+    {"username": "estudiante1", "nombre": "Delfina", "apellido": "Mondino"},
+    {"username": "estudiante2", "nombre": "Sally", "apellido": "Bowls"},
+    {"username": "estudiante3", "nombre": "Luis", "apellido": "Suarez"},
+    {"username": "estudiante4", "nombre": "Miguel", "apellido": "Cervantes"}
+  ],
+  "usuarios_gestion": [
+    {
+      "username": "secretario",
+      "password": "123",
+      "rol": "SECRETARIO",
+      "nombre": "Admin",
+      "apellido": "General",
+      "depto": null
+    },
+    {
+      "username": "jefe_it",
+      "password": "123",
+      "rol": "JEFE",
+      "nombre": "Juan",
+      "apellido": "Gómez",
+      "depto": "D_INFORMATICA"
+    }
+  ],
+  "reclamos_iniciales": [
+    {
+      "id_temp": 1,
+      "contenido": "El techo de aula 6 tiene una gotera, con la ultima lluvia se vino abajo.",
+      "user_idx": 0,
+      "estado": "pendiente",
+      "depto": "D_MANTENIMIENTO"
+    },
+    {
+      "id_temp": 2,
+      "contenido": "El wifi de la biblioteca anda lento cada tanto, a veces no se puede usar.",
+      "user_idx": 1,
+      "estado": "en_proceso",
+      "depto": "D_INFORMATICA",
+      "tiempo_estimado": 5
+    },
+    {
+      "id_temp": 3,
+      "contenido": "Uno de los microondas del comedor no anda.",
+      "user_idx": 2,
+      "estado": "pendiente",
+      "depto": "D_MANTENIMIENTO"
+    },
+    {
+      "id_temp": 4,
+      "contenido": "En la biblioteca fiUNER no hay ejemplares de Don Quijote de la Mancha.",
+      "user_idx": 4,
+      "estado": "pendiente",
+      "depto": "D_SECRETARIA"
+    }
+  ],
+  "adhesiones_iniciales": [
+    {"reclamo_id_temp": 1, "user_indices": [1, 2, 3]},
+    {"reclamo_id_temp": 2, "user_indices": [0, 3]}
+  ]
+}

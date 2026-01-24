@@ -50,28 +50,28 @@ class Gestor_Reclamos:
         return {"status": "creado", "reclamo_id": nuevo_reclamo.id}
 
     def gestionar_estado_reclamo(self, reclamo_id: int, nuevo_estado: str, tiempo: Optional[int] = None) -> bool:
-    reclamo = self.get_reclamo(reclamo_id)
-    if not reclamo:
+        reclamo = self.get_reclamo(reclamo_id)
+        if not reclamo:
+            return False
+
+        # REQUERIMIENTO 2024: Validación de 1 a 15 días al pasar a 'en proceso' 
+        if nuevo_estado == EstadoReclamo.EN_PROCESO.value:
+            if tiempo is None or not (1 <= tiempo <= 15):
+                return False  # Rechaza el cambio si no hay tiempo o está fuera de rango
+            reclamo.tiempo_estimado = tiempo
+
+        # REQUERIMIENTO 2024: Registrar tiempo final al pasar a 'resuelto' 
+        if nuevo_estado == EstadoReclamo.RESUELTO.value:
+            # Si el reclamo se resuelve, el tiempo de resolución para la mediana 
+            # será el tiempo estimado que se cumplió (o podrías calcular la diferencia de fechas)
+            reclamo.tiempo_resolucion = reclamo.tiempo_estimado or 0
+
+        if nuevo_estado in [e.value for e in EstadoReclamo]:
+            reclamo.estado = nuevo_estado
+            self.db.session.commit()
+            return True
+            
         return False
-
-    # REQUERIMIENTO 2024: Validación de 1 a 15 días al pasar a 'en proceso' 
-    if nuevo_estado == EstadoReclamo.EN_PROCESO.value:
-        if tiempo is None or not (1 <= tiempo <= 15):
-            return False  # Rechaza el cambio si no hay tiempo o está fuera de rango
-        reclamo.tiempo_estimado = tiempo
-
-    # REQUERIMIENTO 2024: Registrar tiempo final al pasar a 'resuelto' 
-    if nuevo_estado == EstadoReclamo.RESUELTO.value:
-        # Si el reclamo se resuelve, el tiempo de resolución para la mediana 
-        # será el tiempo estimado que se cumplió (o podrías calcular la diferencia de fechas)
-        reclamo.tiempo_resolucion = reclamo.tiempo_estimado or 0
-
-    if nuevo_estado in [e.value for e in EstadoReclamo]:
-        reclamo.estado = nuevo_estado
-        self.db.session.commit()
-        return True
-        
-    return False
 
     def derivar_reclamo(self, reclamo_id: int, nuevo_depto_id: str) -> bool:
         # Permite corregir el departamento asignado.

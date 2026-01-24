@@ -4,6 +4,7 @@ import csv # Para generación de reportes CSV
 import sys # Para detección de modo test
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response # Para servicio web
 from functools import wraps # Para decoradores
+import json # Para manejo de JSON
 
 # Importamos la base de datos y los usuarios, reclamos, gestor y analítica
 from modules.usuarios import db, Usuario, UsuarioFinal, JefeDepartamento, SecretarioTecnico
@@ -204,7 +205,7 @@ def descargar_reporte(formato):
     else:
         estrategia = ReporteHTML()
         
-    contenido = analitica.generar_reporte(depto_id, estrategia)
+    contenido = Analitica.generar_reporte(depto_id, estrategia)
     return contenido # Envía el reporte generado
 
 # Derivar reclamo a otro departamento
@@ -262,34 +263,68 @@ def inicializar_sistema():
     db.session.commit()
     print(">>> Usuarios de gestión inicializados correctamente.")
 
+def inicializar_desde_archivo():
+    archivo_ruta = 'semillas.json'
+    if not os.path.exists(archivo_ruta): return
+
+    with open(archivo_ruta, 'r', encoding='utf-8') as f:
+        datos = json.load(f)
+
+    # 1. Crear Usuarios (Gestión y Finales)
+    todos_los_users = []
+    # Cargamos gestión
+    for u in datos['usuarios_gestion']:
+        user = Usuario.query.filter_by(username=u['username']).first()
+        if not user:
+            user = Usuario(username=u['username'], password=u['password'], rol_admin=u['rol'], 
+                           departamento_id=u['depto'], nombre=u['nombre'], apellido=u['apellido'])
+            db.session.add(user)
+        todos_los_users.append(user)
+    
+    # Cargamos finales (los que crean y se adhieren)
+    for u in datos['usuarios_finales']:
+        user = Usuario.query.filter_by(username=u['username']).first()
+        if not user:
+            user = Usuario(username=u['username'], password='123', rol_admin='FINAL',
+                           nombre=u['nombre'], apellido=u['apellido'])
+            db.session.add(user)
+        todos_los_users.append(user)
+    
+    db.session.commit() # Guardamos para tener IDs reales
+
+    # 2. Crear Reclamos y mapear IDs temporales
+    mapa_reclamos = {}
+    if Reclamo.query.count() == 0:
+        usuarios_f = Usuario.query.filter_by(rol_admin='FINAL').all()
+        for r in datos['reclamos_iniciales']:
+            autor = usuarios_f[r['user_idx']]
+            nuevo_rec = Reclamo(
+                contenido=r['contenido'], usuario_id=autor.id,
+                estado=r['estado'], departamento_id=r.get('depto'),
+                tiempo_estimado=r.get('tiempo_estimado')
+            )
+            db.session.add(nuevo_rec)
+            db.session.flush() # Para obtener el ID del reclamo sin cerrar la sesión
+            mapa_reclamos[r['id_temp']] = nuevo_rec
+
+        # 3. Crear Adhesiones (La parte Many-to-Many)
+        for adh in datos['adhesiones_iniciales']:
+            rec = mapa_reclamos.get(adh['reclamo_id_temp'])
+            if rec:
+                for idx in adh['user_indices']:
+                    usuario_que_apoya = usuarios_f[idx]
+                    if usuario_que_apoya not in rec.seguidores:
+                        rec.seguidores.append(usuario_que_apoya)
+        
+        db.session.commit()
+    print(">>> Carga masiva completada: Usuarios, Reclamos y Adhesiones listos.")
 
 if __name__ == '__main__':
     with app.app_context(): # Asegura que tengamos la databese para la app
         # 1. Crea las tablas. Si ya existen, no toca los datos que hay adentro.
         db.create_all()
 
-        # 2. Verifica y crea el Secretario base (solo si no existe)
-        if not Usuario.query.filter_by(username='secretario').first():
-            admin = SecretarioTecnico(
-                username='secretario', 
-                password='1234', 
-                nombre='Secretario',
-                apellido='Técnico'
-            )
-            db.session.add(admin)
-            print(">>> Usuario 'secretario' creado por primera vez.")
-
-        # 3. Verifica y crea el Jefe de Infraestructura (solo si no existe)
-        if not Usuario.query.filter_by(username='jefe_infra').first():
-            jefe = JefeDepartamento(
-                username='jefe_infra', 
-                password='1234', 
-                nombre='Jefe',
-                apellido='Infraestructura',
-                departamento_id='D_INFRAESTRUCTURA'
-            )
-            db.session.add(jefe)
-            print(">>> Usuario 'jefe_infra' creado por primera vez.")
+        inicializar_desde_archivo()
 
         # 4. Guarda los cambios
         db.session.commit()
