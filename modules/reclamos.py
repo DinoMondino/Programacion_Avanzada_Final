@@ -27,6 +27,8 @@ class Reclamo(db.Model):
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
     # Usuarios que apoyan este reclamo
     seguidores = db.relationship('Usuario', secondary=adhesiones, backref='reclamos_apoyados')
+    tiempo_estimado = db.Column(db.Integer, nullable=True) # en días
+    tiempo_resolucion = db.Column(db.Integer, nullable=True)
 
     def get_num_adherentes(self) -> int:
         return len(self.seguidores)

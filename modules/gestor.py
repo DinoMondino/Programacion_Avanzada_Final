@@ -49,15 +49,28 @@ class Gestor_Reclamos:
         self.db.session.commit() # Confirma los cambios en la base de datos
         return {"status": "creado", "reclamo_id": nuevo_reclamo.id}
 
-    def gestionar_estado_reclamo(self, reclamo_id: int, nuevo_estado: str) -> bool: # bool indica si se pudo cambiar
-        # Cambia el estado del reclamo (Responsabilidad del Gestor, no del Secretario).
+    def gestionar_estado_reclamo(self, reclamo_id: int, nuevo_estado: str, tiempo: Optional[int] = None) -> bool:
+        """
+        Cambia el estado del reclamo y asigna tiempo estimado si pasa a 'en proceso'.
+        """
         reclamo = self.get_reclamo(reclamo_id)
-        if reclamo:
-            # Validamos que el estado sea un valor del Enum
-            if nuevo_estado in [e.value for e in EstadoReclamo]:
-                reclamo.estado = nuevo_estado
-                self.db.session.commit()
-                return True
+        if not reclamo:
+            return False
+
+        # --- LÓGICA DE VALIDACIÓN ---
+        if nuevo_estado == EstadoReclamo.EN_PROCESO.value:
+            # Verificamos que el jefe haya enviado un tiempo y que esté en el rango 
+            if tiempo is None or not (1 <= tiempo <= 15):
+                return False  # El sistema rechaza el cambio si no cumple la regla
+            
+            reclamo.tiempo_estimado = tiempo # Guardamos en la nueva columna de la BD
+
+        # Validamos que el estado sea un valor permitido [cite: 123]
+        if nuevo_estado in [e.value for e in EstadoReclamo]:
+            reclamo.estado = nuevo_estado
+            self.db.session.commit()
+            return True
+            
         return False
 
     def derivar_reclamo(self, reclamo_id: int, nuevo_depto_id: str) -> bool:
