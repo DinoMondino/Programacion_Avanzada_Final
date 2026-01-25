@@ -6,15 +6,15 @@ import io
 from functools import wraps
 from datetime import datetime, timezone
 
+app = Flask(__name__)
+app.secret_key = 'super_secreto_uner'
+basedir = os.path.abspath(os.path.dirname(__file__))
+
 # Importaciones de tus módulos
 from modules.usuarios import db, Usuario, RolAdmin
 from modules.reclamos import Reclamo, Clasificador, EstadoReclamo
 from modules.gestor import Gestor_Reclamos
 from modules.departamentos import Analitica, ReporteHTML, ReportePDF
-
-app = Flask(__name__)
-app.secret_key = 'super_secreto_uner'
-basedir = os.path.abspath(os.path.dirname(__file__))
 
 # 1. BLINDAJE DE DB (Mantiene tus reclamos reales a salvo de los tests)
 if 'pytest' in sys.modules or 'pytest' in sys.argv[0]:
