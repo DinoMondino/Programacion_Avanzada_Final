@@ -3,6 +3,7 @@ import sys
 import json
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from functools import wraps
+from datetime import datetime, timezone
 
 # Importaciones de tus módulos
 from modules.usuarios import db, Usuario, RolAdmin
@@ -102,50 +103,73 @@ def logout():
 def dashboard():
     usuario = Usuario.query.get(session['user_id'])
     
-    # Si es Jefe o Secretario, va al panel de Analítica
+    # --- Lógica de Admin (Jefe/Secretario) ---
     if usuario.rol_admin.value in ['JEFE', 'SECRETARIO']:
         datos_dash = analitica.obtener_datos_dashboard(usuario.departamento_id)
-        if usuario.departamento_id == 1:
+        depto_str = str(usuario.departamento_id)
+        if usuario.departamento_id == 1 or depto_str == 'D_GENERAL' or usuario.rol_admin.value == 'SECRETARIO':
             lista_para_tabla = Reclamo.query.all()
         else:
+            # Filtramos estrictamente por el depto del Jefe
             lista_para_tabla = Reclamo.query.filter_by(departamento_id=usuario.departamento_id).all()
+        
         return render_template('admin_dashboard.html', 
-                           user=usuario, 
-                           datos=datos_dash, 
-                           reclamos=lista_para_tabla)
+                               user=usuario, 
+                               datos=datos_dash, 
+                               reclamos=lista_para_tabla)
     
-    # Si es usuario final, ve sus reclamos y los globales para adherirse
+    # --- Lógica de Estudiante (Usuario Final) ---
+    # 1. Sus propios reclamos (aquí sí ve todo, incluso sus resueltos)
     mis_reclamos = Reclamo.query.filter_by(usuario_id=usuario.id).all()
-    otros_reclamos = Reclamo.query.filter(Reclamo.usuario_id != usuario.id).all()
-    return render_template('user_dashboard.html', user=usuario, reclamos=mis_reclamos, otros=otros_reclamos)
+    
+    # 2. Reclamos de otros que NO estén resueltos
+    otros_reclamos = Reclamo.query.filter(
+        Reclamo.usuario_id != usuario.id,
+        Reclamo.estado != 'resuelto'
+    ).all()
+    
+    return render_template('user_dashboard.html', 
+                           user=usuario, 
+                           reclamos=mis_reclamos, 
+                           otros=otros_reclamos)
 
-@app.route('/crear_reclamo', methods=['GET', 'POST'])
+@app.route('/crear_reclamo', methods=['POST'])
 @login_required
 def crear_reclamo():
-    if request.method == 'POST':
-        contenido = request.form.get('contenido')
-        archivo = request.files.get('foto')
-        confirmar_nuevo = request.form.get('confirmar_nuevo')
+    usuario = Usuario.query.get(session['user_id'])
+    contenido = request.form.get('contenido')
+    confirmado = request.form.get('confirmado')
 
-        nombre_archivo = None
-        if archivo and archivo.filename != '':
-            nombre_archivo = archivo.filename
-            archivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo))
-
-        # LÓGICA DE SIMILITUD (EVITA DUPLICADOS)
-        historial = {r.id: r for r in Reclamo.query.all()}
-        similares_ids = clasificador.buscar_similares(contenido, historial)
-        
-        if similares_ids and not confirmar_nuevo:
-            similar = Reclamo.query.get(similares_ids[0])
-            return render_template('crear_reclamo.html', reclamo_similar=similar, contenido_previo=contenido)
-
-        # Si no hay similar o confirmó, se crea
-        gestor.crear_reclamo(contenido=contenido, adjunto=nombre_archivo, usuario_id=session['user_id'])
+    # Si el usuario ignoró la advertencia y dio a "Crear Nuevo"
+    if confirmado == 'true':
+        gestor.crear_reclamo(contenido=contenido, usuario_id=usuario.id)
         flash("Reclamo creado con éxito.", "success")
         return redirect(url_for('dashboard'))
+
+    # Lógica de búsqueda de similares
+    historial = {r.id: r for r in Reclamo.query.all()}
+    similares_ids = clasificador.buscar_similares(contenido, historial)
+    
+    if similares_ids:
+        similares_objs = Reclamo.query.filter(Reclamo.id.in_(similares_ids)).all()
         
-    return render_template('crear_reclamo.html', reclamo_similar=None)
+        # Cargamos los datos para que el dashboard no rompa
+        mis_reclamos = Reclamo.query.filter_by(usuario_id=usuario.id).all()
+        otros_reclamos = Reclamo.query.filter(Reclamo.usuario_id != usuario.id, Reclamo.estado != 'resuelto').all()
+        
+        # IMPORTANTE: Pasamos una variable para forzar la pestaña activa en el HTML
+        return render_template('user_dashboard.html', 
+                               user=usuario, 
+                               reclamos=mis_reclamos, 
+                               otros=otros_reclamos,
+                               reclamos_similares=similares_objs, 
+                               contenido_pendiente=contenido,
+                               mostrar_similares=True) # <--- Variable nueva
+
+    # Si no hay similares, crear directamente
+    gestor.crear_reclamo(contenido=contenido, usuario_id=usuario.id)
+    flash("Reclamo enviado correctamente.", "success")
+    return redirect(url_for('dashboard'))
 
 @app.route('/adherirse/<int:id_reclamo>', methods=['POST'])
 @login_required
@@ -176,14 +200,29 @@ def derivar_reclamo(id_reclamo):
 @login_required
 @admin_required
 def gestionar_reclamo(id_reclamo):
+    reclamo = Reclamo.query.get_or_404(id_reclamo)
     nuevo_estado = request.form.get('estado')
-    # CAPTURA DEL PLAZO (1-15 días) - Obligatorio para 'en_proceso'
     tiempo = request.form.get('tiempo', type=int)
     
+    # 1. Si el estado es resuelto, calculamos la métrica ANTES de guardar
+    if nuevo_estado == 'resuelto':
+        fecha_hoy = datetime.now(timezone.utc)
+        # Aseguramos que ambos sean naive (sin timezone) para la resta
+        f_creacion = reclamo.fecha_creacion.replace(tzinfo=None)
+        f_ahora = fecha_hoy.replace(tzinfo=None)
+        
+        diferencia = f_ahora - f_creacion
+        # Guardamos la duración real para la Analítica
+        reclamo.tiempo_resolucion = max(1, diferencia.days)
+
+    # 2. Usamos tu lógica de gestor para validar y guardar
     if gestor.gestionar_estado_reclamo(id_reclamo, nuevo_estado, tiempo):
+        # El gestor ya debería hacer el commit, pero si no, asegúralo aquí:
+        db.session.commit()
         flash(f"Estado actualizado a {nuevo_estado}", "success")
     else:
         flash("Error: El tiempo debe ser de 1 a 15 días para pasar a 'En Proceso'.", "danger")
+        
     return redirect(url_for('dashboard'))
 
 @app.route('/reporte/<formato>')
@@ -248,11 +287,12 @@ def inicializar_desde_archivo():
                 if idx < len(usuarios_f):
                     autor = usuarios_f[idx]
                     nuevo_rec = Reclamo(
-                        contenido=r['contenido'], 
+                        contenido=r['contenido'],
                         usuario_id=autor.id,
-                        estado=r['estado'], 
+                        estado=r['estado'],
                         departamento_id=r.get('depto'),
-                        tiempo_estimado=r.get('tiempo_estimado')
+                        tiempo_estimado=r.get('tiempo_estimado'),
+                        adjunto_url=r.get('adjunto_url')
                     )
                     db.session.add(nuevo_rec)
                     db.session.flush()

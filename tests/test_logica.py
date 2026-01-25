@@ -14,9 +14,9 @@ def test_clasificacion_y_adhesion(app, gestor_servicio):
 
         # 2. El gestor debe devolver "creado" y asignar D_INFORMATICA por la palabra 'wifi'
         res1 = gestor_servicio.crear_reclamo(
-            "No funciona el wifi, en el aula de programación no hay internet", 
-            None, 
-            u1.id
+            "No funciona el wifi, en el aula de programación no hay internet",
+            u1.id,  # El ID del usuario va SEGUNDO ahora
+            None    # El adjunto va TERCERO
         )
         
         assert res1["status"] == "creado"

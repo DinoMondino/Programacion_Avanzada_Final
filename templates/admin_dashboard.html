@@ -8,7 +8,7 @@
                 <i class="bi bi-question-circle"></i> Ayuda
             </button>
             <h1 class="mb-0">
-                <i class=></i> Panel de {{ user.rol_admin }}
+                <i class="bi bi-person-badge"></i> Panel de {{ user.rol_admin.value }}
                 {% if user.departamento_id %}
                     - {{ user.departamento_id.replace('D_', '') }}
                 {% endif %}
@@ -94,56 +94,111 @@
                         <thead class="table-dark">
                             <tr>
                                 <th>ID</th>
-                                <th>Usuario</th>
+                                <th>Fecha</th>
+                                <th>Autor</th>
+                                <th>Área</th>
                                 <th>Contenido</th>
-                                <th>Apoyos</th>
+                                <th>Foto</th>
+                                <th>Adheridos</th>
                                 <th>Estado y Plazo</th>
-                                <th>Acciones / Derivar</th>
+                                <th>Acción</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for rec in reclamos %}
                             <tr>
                                 <td><strong>#{{ rec.id }}</strong></td>
-                                <td>{{ rec.autor.nombre }}</td>
-                                <td><small title="{{ rec.contenido }}">{{ rec.contenido[:50] }}...</small></td>
+                                <td><small>{{ rec.fecha_creacion.strftime('%d/%m/%Y') if rec.fecha_creacion else 'N/A' }}</small></td>
+                                <td>{{ rec.autor.nombre }} {{ rec.autor.apellido or '' }}</td>
+                                <td><span class="badge bg-secondary">{{ rec.departamento_id.replace('D_', '') if rec.departamento_id else 'General' }}</span></td>
+                                
+                                <td>
+                                    <div style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#modalContenido-{{ rec.id }}">
+                                        <small class="text-dark">{{ rec.contenido[:25] }}...</small>
+                                        <i class="bi bi-zoom-in text-primary small"></i>
+                                    </div>
+                                </td>
+
                                 <td class="text-center">
-                                    <span class="badge bg-danger rounded-pill">{{ rec.seguidores|length }}</span>
+                                    {% if rec.adjunto_url %}
+                                        <a href="{{ url_for('static', filename='uploads/' + rec.adjunto_url) }}" target="_blank" class="text-info">
+                                            <i class="bi bi-camera-fill fs-5"></i>
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted small">Sin foto</span>
+                                    {% endif %}
+                                </td>
+                                
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalAdheridos-{{ rec.id }}">
+                                        <i class="bi bi-people-fill"></i> {{ rec.seguidores|length }}
+                                    </button>
                                 </td>
 
                                 <td>
-                                    <form action="{{ url_for('gestionar_reclamo', id_reclamo=rec.id) }}" method="POST" class="d-flex gap-2 align-items-center">
+                                    <form action="{{ url_for('gestionar_reclamo', id_reclamo=rec.id) }}" method="POST" class="d-flex gap-1 align-items-center">
                                         <select name="estado" class="form-select form-select-sm w-auto" onchange="toggleTiempo(this, {{ rec.id }})">
                                             <option value="pendiente" {% if rec.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
                                             <option value="en_proceso" {% if rec.estado == 'en_proceso' %}selected{% endif %}>En Proceso</option>
                                             <option value="resuelto" {% if rec.estado == 'resuelto' %}selected{% endif %}>Resuelto</option>
-                                            <option value="inválido" {% if rec.estado == 'inválido' %}selected{% endif %}>Inválido</option>
                                         </select>
-
-                                        <input type="number" name="tiempo" id="tiempo-{{ rec.id }}" 
-                                            class="form-control form-control-sm" style="display:none; width: 85px;" 
-                                            min="1" max="15" placeholder="1-15 días">
-
-                                        <button type="submit" class="btn btn-sm btn-primary">Actualizar</button>
+                                        <input type="number" name="tiempo" id="tiempo-{{ rec.id }}" class="form-control form-control-sm" style="display:none; width: 60px;" placeholder="Días">
+                                        <button type="submit" class="btn btn-sm btn-primary px-1">OK</button>
                                     </form>
                                 </td>
 
                                 <td>
                                     {% if user.rol_admin.value == 'SECRETARIO' %}
                                     <form action="{{ url_for('derivar_reclamo', id_reclamo=rec.id) }}" method="post" class="d-flex gap-1">
-                                        <select name="nuevo_depto" class="form-select form-select-sm border-primary">
-                                            <option value="" disabled selected>Derivar a...</option>
+                                        <select name="nuevo_depto" class="form-select form-select-sm">
                                             <option value="D_INFORMATICA">Informática</option>
                                             <option value="D_MANTENIMIENTO">Mantenimiento</option>
-                                            <option value="D_BIBLIOTECA">Biblioteca</option>
+                                            <option value="D_SECRETARIA">Secretaría</option>
                                         </select>
-                                        <button type="submit" class="btn btn-sm btn-outline-primary">OK</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-primary py-0">»</button>
                                     </form>
                                     {% else %}
-                                        <span class="text-muted small"><i class="bi bi-lock"></i> Jefe de Área</span>
+                                        <span class="text-muted small"><i class="bi bi-lock"></i> Fijo</span>
                                     {% endif %}
                                 </td>
                             </tr>
+
+                            <div class="modal fade" id="modalContenido-{{ rec.id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-primary text-white">
+                                            <h5 class="modal-title">Detalle Reclamo #{{ rec.id }}</h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p style="white-space: pre-wrap;">{{ rec.contenido }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal fade" id="modalAdheridos-{{ rec.id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-danger text-white">
+                                            <h5 class="modal-title"><i class="bi bi-people"></i> Adheridos #{{ rec.id }}</h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-0">
+                                            <ul class="list-group list-group-flush">
+                                                {% for seguidor in rec.seguidores %}
+                                                    <li class="list-group-item">
+                                                        <strong>{{ seguidor.nombre }} {{ seguidor.apellido or '' }}</strong>
+                                                        <small class="text-muted d-block">ID: {{ seguidor.username }}</small>
+                                                    </li>
+                                                {% else %}
+                                                    <li class="list-group-item text-center py-3 text-muted">Sin adheridos</li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -153,9 +208,35 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalAyuda" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-info-circle"></i> Guía del Panel Administrativo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {% if user.rol_admin.value == 'SECRETARIO' %}
+                    <h6><i class="bi bi-star text-warning"></i> Funciones de Secretaría</h6>
+                    <ul>
+                        <li><strong>Derivación:</strong> Seleccione un área técnica y presione el botón » para asignar el reclamo.</li>
+                        <li><strong>Reportes:</strong> Use el botón superior para descargar la analítica en PDF.</li>
+                    </ul>
+                {% else %}
+                    <h6><i class="bi bi-gear-fill text-primary"></i> Gestión de Área Técnica</h6>
+                    <ul>
+                        <li><strong>En Proceso:</strong> Al cambiar a este estado, ingrese un plazo (ej. 5 días).</li>
+                        <li><strong>Resolución:</strong> Marque como "Resuelto" solo cuando el trabajo haya finalizado.</li>
+                    </ul>
+                {% endif %}
+                <p class="small bg-light p-2 rounded"><i class="bi bi-lightbulb"></i> Tip: Haga clic en la vista previa del contenido para leer el reclamo completo.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // 1. Gráfico Circular de Estados
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('chartEstados').getContext('2d');
         new Chart(ctx, {
@@ -163,30 +244,18 @@
             data: {
                 labels: ['Pendientes', 'En Proceso', 'Resueltos'],
                 datasets: [{
-                    data: [
-                        {{ datos.stats.pendientes | default(0) }},
-                        {{ datos.stats.en_proceso | default(0) }},
-                        {{ datos.stats.resueltos | default(0) }}
-                    ],
-                    backgroundColor: ['#ffc107', '#0dcaf0', '#198754'],
-                    borderWidth: 2,
-                    borderColor: '#ffffff'
+                    data: [{{ datos.stats.pendientes }}, {{ datos.stats.en_proceso }}, {{ datos.stats.resueltos }}],
+                    backgroundColor: ['#ffc107', '#0dcaf0', '#198754']
                 }]
             },
-            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+            options: { responsive: true }
         });
     });
 
-    // 2. Mostrar/Ocultar campo de tiempo (Req. 2024: 15 días)
     function toggleTiempo(select, id) {
         const input = document.getElementById('tiempo-' + id);
-        if (select.value === 'en_proceso') {
-            input.style.display = 'block';
-            input.required = true;
-        } else {
-            input.style.display = 'none';
-            input.required = false;
-        }
+        input.style.display = (select.value === 'en_proceso') ? 'block' : 'none';
+        input.required = (select.value === 'en_proceso');
     }
 </script>
 {% endblock %}

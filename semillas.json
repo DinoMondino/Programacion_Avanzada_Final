@@ -3,7 +3,7 @@
     "departamentos": [
       {"id": "D_INFORMATICA", "nombre": "Departamento de Informática"},
       {"id": "D_MANTENIMIENTO", "nombre": "Departamento de Mantenimiento"},
-      {"id": "D_BIBLIOTECA", "nombre": "Biblioteca y Recursos"}
+      {"id": "D_SECRETARÍA", "nombre": "Secretaría"}
     ]
   },
   "usuarios_finales": [
@@ -28,6 +28,14 @@
       "nombre": "Juan",
       "apellido": "Gómez",
       "depto": "D_INFORMATICA"
+    },
+    {
+      "username": "jefe_mant",
+      "password": "123",
+      "rol": "JEFE",
+      "nombre": "María",
+      "apellido": "López",
+      "depto": "D_MANTENIMIENTO"
     }
   ],
   "reclamos_iniciales": [
@@ -56,9 +64,17 @@
     {
       "id_temp": 4,
       "contenido": "En la biblioteca fiUNER no hay ejemplares de Don Quijote de la Mancha.",
-      "user_idx": 4,
+      "user_idx": 3,
       "estado": "pendiente",
       "depto": "D_SECRETARIA"
+    },
+    {
+      "id_temp": 5,
+      "contenido": "Hay un nido de comadrejas cerca de la entrada al campus.",
+      "user_idx": 0,
+      "estado": "pendiente",
+      "depto": "D_MANTENIMIENTO",
+      "adjunto_url": "comadreja.jpg" 
     }
   ],
   "adhesiones_iniciales": [

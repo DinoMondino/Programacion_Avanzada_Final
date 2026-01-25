@@ -2,74 +2,84 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Panel de Usuario: {{ user.nombre }}</h1>
-        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">Cerrar Sesión</a>
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+        <div>
+            <h1 class="h3 mb-0">Panel de Estudiante: <span class="text-primary">{{ user.nombre }} {{ user.apellido or '' }}</span></h1>
+            <small class="text-muted">ID de Usuario: {{ user.username }}</small>
+        </div>
+        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm shadow-sm">
+            <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+        </a>
     </div>
 
-    <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
+    <ul class="nav nav-pills mb-4 shadow-sm p-2 bg-white rounded" id="pills-tab" role="tablist">
         <li class="nav-item">
-            <button class="nav-link {% if not reclamos_similares %}active{% endif %}" data-bs-toggle="pill" data-bs-target="#crear">🆕 Crear Reclamo</button>
+            <button class="nav-link {% if mostrar_similares or not reclamos_similares %}active{% endif %}" data-bs-toggle="pill" data-bs-target="#crear">
+                <i class="bi bi-plus-circle"></i> Nuevo Reclamo
+            </button>
         </li>
         <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#mis-reclamos">📂 Mis Reclamos</button>
+            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#mis-reclamos">
+                <i class="bi bi-folder2-open"></i> Mis Reclamos
+            </button>
         </li>
         <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#listar-todos">🌐 Listar Todos</button>
+            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#listar-todos">
+                <i class="bi bi-globe"></i> Comunidad (Activos)
+            </button>
         </li>
     </ul>
 
     <div class="tab-content">
-        <div class="tab-pane fade show active" id="crear">
+        <div class="tab-pane fade {% if mostrar_similares or not reclamos_similares %}show active{% endif %}" id="crear">
             <div class="card shadow-sm col-md-8 mx-auto border-0">
-                <div class="card-body">
+                <div class="card-body p-4">
                     
                     {% if reclamos_similares %}
-                    <div class="alert alert-warning shadow border-warning animate__animated animate__fadeIn">
-                        <h4 class="alert-heading"><i class="bi bi-exclamation-triangle-fill"></i> ¡Espera! Reclamos Similares Detectados</h4>
-                        <p>Analizamos tu reclamo y encontramos que otros estudiantes ya reportaron algo parecido. ¿Quieres unirte a uno de ellos?</p>
+                    <div class="alert alert-warning shadow-sm border-warning mb-4 animate__animated animate__fadeIn">
+                        <h4 class="alert-heading text-dark"><i class="bi bi-exclamation-triangle-fill"></i> ¡Reclamos Similares Detectados!</h4>
+                        <p>Parece que otros estudiantes ya reportaron algo similar. Sumar tu apoyo ayuda a priorizar el problema.</p>
                         <hr>
                         <div class="list-group mb-3">
                             {% for sim in reclamos_similares %}
-                            <div class="list-group-item d-flex justify-content-between align-items-center bg-white">
-                                <div>
-                                    <span class="badge bg-secondary mb-1">#{{ sim.id }}</span>
-                                    <p class="mb-0 small text-dark">{{ sim.contenido[:120] }}...</p>
+                            <div class="list-group-item d-flex justify-content-between align-items-center bg-white border">
+                                <div class="pe-2">
+                                    <span class="badge bg-secondary">#{{ sim.id }}</span>
+                                    <p class="mb-0 small text-dark">{{ sim.contenido[:100] }}...</p>
                                 </div>
-                                <form action="{{ url_for('adherirse', id_reclamo=sim.id) }}" method="post" class="ms-3">
+                                <form action="{{ url_for('adherirse', id_reclamo=sim.id) }}" method="POST">
                                     <button type="submit" class="btn btn-sm btn-success text-nowrap">
-                                        <i class="bi bi-person-plus"></i> Es este, Adherirme
+                                        <i class="bi bi-person-plus"></i> Es este, apoyarlo
                                     </button>
                                 </form>
                             </div>
                             {% endfor %}
                         </div>
 
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">Si estás seguro de que tu problema es diferente:</small>
-                            <form action="{{ url_for('crear_reclamo') }}" method="post">
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <small class="text-muted">¿Tu problema es totalmente distinto?</small>
+                            <form action="{{ url_for('crear_reclamo') }}" method="POST">
                                 <input type="hidden" name="contenido" value="{{ contenido_pendiente }}">
                                 <input type="hidden" name="confirmado" value="true">
-                                <button type="submit" class="btn btn-primary btn-sm shadow">No es ninguno, crear nuevo</button>
-                                <a href="{{ url_for('user_dashboard') }}" class="btn btn-link btn-sm text-secondary">Cancelar</a>
+                                <button type="submit" class="btn btn-primary btn-sm shadow-sm">Ignorar y crear nuevo</button>
+                                <a href="{{ url_for('dashboard') }}" class="btn btn-link btn-sm text-secondary text-decoration-none">Cancelar</a>
                             </form>
                         </div>
                     </div>
                     {% endif %}
 
-                    <form action="{{ url_for('crear_reclamo') }}" method="post" enctype="multipart/form-data" 
-                          {% if reclamos_similares %}style="display:none;"{% endif %}>
+                    <form id="formCrearPrincipal" action="{{ url_for('crear_reclamo') }}" method="POST" enctype="multipart/form-data" 
+                        {% if reclamos_similares %}style="display:none;"{% endif %}>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">¿Qué sucede?</label>
+                            <label class="form-label fw-bold">¿Qué sucede en el FI-UNER?</label>
                             <textarea name="contenido" class="form-control" rows="4" required 
-                                      placeholder="Describe detalladamente el problema para que el departamento correspondiente pueda ayudarte mejor."></textarea>
+                                    placeholder="Describe el problema detalladamente..."></textarea>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Evidencia fotográfica (Opcional)</label>
+                            <label class="form-label fw-bold"><i class="bi bi-camera"></i> Evidencia (Opcional)</label>
                             <input type="file" name="foto" class="form-control" accept="image/*">
-                            <div class="form-text">Solo el personal administrativo podrá ver esta imagen.</div>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100 shadow-sm py-2">
+                        <button type="submit" class="btn btn-primary w-100 shadow-sm py-2" onclick="this.innerHTML='Buscando similares...';">
                             <i class="bi bi-send"></i> Enviar Reclamo
                         </button>
                     </form>
@@ -84,7 +94,8 @@
                         <thead class="table-dark">
                             <tr>
                                 <th>ID</th>
-                                <th>Fecha y Hora</th> <th>Estado</th>
+                                <th>Fecha y Hora</th>
+                                <th>Estado</th>
                                 <th>Resumen</th>
                                 <th class="text-center">Foto</th>
                             </tr>
@@ -93,25 +104,25 @@
                             {% for r in reclamos %}
                             <tr>
                                 <td><strong>#{{ r.id }}</strong></td>
-                                <td><small>{{ r.fecha_creacion.strftime('%d/%m/%y %H:%M') if r.fecha_creacion else '-' }}</small></td>
+                                <td><small class="text-muted">{{ r.fecha_creacion.strftime('%d/%m/%y %H:%M') if r.fecha_creacion else '-' }}</small></td>
                                 <td>
                                     <span class="badge {% if r.estado == 'pendiente' %}bg-warning text-dark{% elif r.estado == 'en_proceso' %}bg-info{% elif r.estado == 'resuelto' %}bg-success{% endif %}">
                                         {{ r.estado.upper() }}
                                     </span>
                                 </td>
-                                <td>{{ r.contenido[:50] }}...</td>
+                                <td>{{ r.contenido[:60] }}...</td>
                                 <td class="text-center">
                                     {% if r.adjunto_url %}
-                                    <a href="{{ url_for('static', filename='uploads/' + r.adjunto_url) }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-image"></i> Ver
+                                    <a href="{{ url_for('static', filename='uploads/' + r.adjunto_url) }}" target="_blank" class="text-info fs-5">
+                                        <i class="bi bi-image-fill"></i>
                                     </a>
                                     {% else %}
-                                    <span class="text-muted small">Sin adjunto</span>
+                                    <span class="text-muted small">Sin foto</span>
                                     {% endif %}
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="5" class="text-center py-4 text-muted">Aún no has realizado ningún reclamo.</td></tr>
+                            <tr><td colspan="5" class="text-center py-5 text-muted">Aún no has realizado ningún reclamo propio.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -121,47 +132,81 @@
 
         <div class="tab-pane fade" id="listar-todos">
             <div class="row">
-                {% for r in all_reclamos %}
+                {% for r in otros %}
                 <div class="col-md-12 mb-3">
-                    <div class="card shadow-sm border-start border-primary border-4">
-                        <div class="card-body d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-primary mb-1">
-                                    Reclamo #{{ r.id }} | 
-                                    <span class="badge bg-light text-dark border">{{ r.departamento_id.replace('D_', '') if r.departamento_id else 'GENERAL' }}</span>
-                                    
-                                    <span class="badge {% if r.estado == 'pendiente' %}bg-warning text-dark{% elif r.estado == 'en_proceso' %}bg-info{% elif r.estado == 'resuelto' %}bg-success{% else %}bg-secondary{% endif %} ms-2">
-                                        {{ r.estado.replace('_', ' ').upper() }}
-                                    </span>
-                                </h6>
-                                
-                                <p class="mb-1 text-dark">{{ r.contenido }}</p>
-                                
-                                <div class="text-muted small">
-                                    <i class="bi bi-calendar-event"></i> {{ r.fecha_creacion.strftime('%d/%m/%Y') if r.fecha_creacion else '-' }} |
-                                    <i class="bi bi-people-fill"></i> Apoyos: <strong>{{ r.seguidores|length if r.seguidores else 0 }}</strong>
+                    <div class="card shadow-sm border-start border-primary border-4 hover-shadow">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="h6 text-primary fw-bold mb-1">
+                                        Reclamo #{{ r.id }} | 
+                                        <span class="badge bg-light text-dark border fw-normal">{{ r.departamento_id.replace('D_', '') if r.departamento_id else 'GENERAL' }}</span>
+                                        <span class="badge {% if r.estado == 'pendiente' %}bg-warning text-dark{% else %}bg-info{% endif %} ms-2 fw-normal">
+                                            {{ r.estado.replace('_', ' ').upper() }}
+                                        </span>
+                                    </h5>
+                                    <div class="text-muted" style="font-size: 0.85rem;">
+                                        <i class="bi bi-calendar3"></i> Publicado: {{ r.fecha_creacion.strftime('%d/%m/%Y %H:%M') if r.fecha_creacion else '-' }}
+                                    </div>
                                 </div>
+                                
+                                <form action="{{ url_for('adherirse', id_reclamo=r.id) }}" method="post">
+                                    <button type="submit" class="btn btn-success btn-sm px-3 shadow-sm">
+                                        <i class="bi bi-hand-thumbs-up-fill"></i> Apoyar
+                                    </button>
+                                </form>
                             </div>
+
+                            <p class="mb-3 text-dark text-break">{{ r.contenido[:180] }}...</p>
                             
-                            {% if r.usuario_id != user.id %}
-                            <form action="{{ url_for('adherirse', id_reclamo=r.id) }}" method="post">
-                                <button class="btn btn-sm btn-success shadow-sm">
-                                    <i class="bi bi-hand-thumbs-up"></i> Apoyar
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="small">
+                                    <span class="text-primary fw-bold"><i class="bi bi-people-fill"></i> {{ r.seguidores|length }}</span> 
+                                    <span class="text-muted">estudiantes apoyan esto</span>
+                                </div>
+                                <button class="btn btn-link btn-sm p-0 text-decoration-none fw-bold" data-bs-toggle="modal" data-bs-target="#modalDetalle-{{ r.id }}">
+                                    <i class="bi bi-eye"></i> Leer completo
                                 </button>
-                            </form>
-                            {% else %}
-                            <span class="badge bg-secondary opacity-75">Mi Reclamo</span>
-                            {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal fade" id="modalDetalle-{{ r.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow-lg">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title">Detalle de Reclamo #{{ r.id }}</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body p-4 text-dark">
+                                <p style="white-space: pre-wrap;">{{ r.contenido }}</p>
+                            </div>
+                            <div class="modal-footer bg-light">
+                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                            </div>
                         </div>
                     </div>
                 </div>
                 {% else %}
-                <div class="col-12 text-center py-5 text-muted">
-                    <p>No hay reclamos públicos para mostrar.</p>
+                <div class="col-12 text-center py-5 text-muted bg-white rounded shadow-sm">
+                    <p>No hay otros reclamos activos en este momento.</p>
                 </div>
                 {% endfor %}
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .hover-shadow:hover {
+        transform: translateY(-2px);
+        transition: all 0.2s ease;
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1) !important;
+    }
+    .nav-pills .nav-link.active {
+        background-color: #0d6efd;
+        box-shadow: 0 4px 6px rgba(13, 110, 253, 0.2);
+    }
+</style>
 {% endblock %}

@@ -32,7 +32,7 @@ class Gestor_Reclamos:
 
 
     # --- MÉTODOS DE ESCRITURA ---
-    def crear_reclamo(self, contenido: str, adjunto: Optional[str], usuario_id: int) -> Dict[str, Any]:
+    def crear_reclamo(self, contenido, usuario_id, adjunto=None) -> Dict[str, Any]:
         # Clasificación automática segun palabras clave
         resultado_clasif = self.clasificador_servicio.clasificar(contenido)
         depto_id = resultado_clasif['departamento_id']
