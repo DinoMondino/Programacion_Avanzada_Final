@@ -1,9 +1,7 @@
 from modules.departamentos import Analitica, ReporteHTML
 
 def test_calculo_mediana_eficiente(gestor_servicio):
-    # Inicializamos analítica con la fixture que SÍ existe
     analitica = Analitica(gestor_servicio)
-    
     # Caso impar
     assert analitica.calcular_mediana([10, 2, 5]) == 5.0
     
