@@ -1,4 +1,5 @@
 from typing import Dict, Any, Optional, List
+from datetime import datetime
 from modules.reclamos import Reclamo, Clasificador, EstadoReclamo
 from modules.usuarios import Usuario, RolAdmin
 
@@ -30,7 +31,6 @@ class Gestor_Reclamos:
         # Si es usuario final, solo ve los que él creó
         return Reclamo.query.filter_by(usuario_id=usuario.id).all()
 
-
     # --- MÉTODOS DE ESCRITURA ---
     def crear_reclamo(self, contenido, usuario_id, adjunto=None) -> Dict[str, Any]:
         # Clasificación automática segun palabras clave
@@ -53,18 +53,20 @@ class Gestor_Reclamos:
         reclamo = self.get_reclamo(reclamo_id)
         if not reclamo:
             return False
-
-        # REQUERIMIENTO 2024: Validación de 1 a 15 días al pasar a 'en proceso' 
+        # Validación de 1 a 15 días al pasar a 'en proceso' 
         if nuevo_estado == EstadoReclamo.EN_PROCESO.value:
             if tiempo is None or not (1 <= tiempo <= 15):
                 return False  # Rechaza el cambio si no hay tiempo o está fuera de rango
             reclamo.tiempo_estimado = tiempo
 
-        # REQUERIMIENTO 2024: Registrar tiempo final al pasar a 'resuelto' 
+        # Registrar tiempo final al pasar a 'resuelto' 
         if nuevo_estado == EstadoReclamo.RESUELTO.value:
-            # Si el reclamo se resuelve, el tiempo de resolución para la mediana 
-            # será el tiempo estimado que se cumplió (o podrías calcular la diferencia de fechas)
-            reclamo.tiempo_resolucion = reclamo.tiempo_estimado or 0
+            # Si el reclamo se resuelve, el tiempo de resolución para la mediana calculando la diferencia de fechas
+            fecha_resolucion = datetime.now()
+            diferencia = fecha_resolucion - reclamo.fecha_creacion
+            dias_reales = round(diferencia.total_seconds() / 86400, 2)
+
+            reclamo.tiempo_resolucion = dias_reales
 
         if nuevo_estado in [e.value for e in EstadoReclamo]:
             reclamo.estado = nuevo_estado
@@ -90,7 +92,8 @@ class Gestor_Reclamos:
         if reclamo and usuario:
             if reclamo.usuario_id == usuario_id or usuario in reclamo.seguidores:
                 return False # No puede adherirse a su propio reclamo o si ya está adherido
-                
+            if reclamo.estado == EstadoReclamo.RESUELTO.value:
+                return False # No tiene sentido adherirse a algo ya arreglado    
             reclamo.seguidores.append(usuario)
             self.db.session.commit()
             return True

@@ -16,7 +16,7 @@ class EstadoReclamo(Enum):
     EN_PROCESO = "en_proceso"
     RESUELTO = "resuelto"
 
-class Reclamo(db.Model):
+class Reclamo(db.Model): # Clase Base para Reclamos, se transforma en tabla 'reclamos' en la base de datos
     __tablename__ = 'reclamos'
     id = db.Column(db.Integer, primary_key=True)
     contenido = db.Column(db.Text, nullable=False)

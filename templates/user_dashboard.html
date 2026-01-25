@@ -150,11 +150,17 @@
                                     </div>
                                 </div>
                                 
-                                <form action="{{ url_for('adherirse', id_reclamo=r.id) }}" method="post">
-                                    <button type="submit" class="btn btn-success btn-sm px-3 shadow-sm">
-                                        <i class="bi bi-hand-thumbs-up-fill"></i> Apoyar
+                                {% if user in r.seguidores %}
+                                    <button class="btn btn-outline-info btn-sm px-3 shadow-sm disabled">
+                                        <i class="bi bi-check-circle-fill"></i> Ya apoyado
                                     </button>
-                                </form>
+                                {% else %}
+                                    <form action="{{ url_for('adherirse', id_reclamo=r.id) }}" method="post">
+                                        <button type="submit" class="btn btn-success btn-sm px-3 shadow-sm">
+                                            <i class="bi bi-hand-thumbs-up-fill"></i> Apoyar
+                                        </button>
+                                    </form>
+                                {% endif %}
                             </div>
 
                             <p class="mb-3 text-dark text-break">{{ r.contenido[:180] }}...</p>

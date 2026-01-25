@@ -1,7 +1,8 @@
 import os
 import sys
 import json
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash,  make_response, send_file
+import io
 from functools import wraps
 from datetime import datetime, timezone
 
@@ -230,13 +231,27 @@ def gestionar_reclamo(id_reclamo):
 @admin_required
 def generar_reporte(formato):
     usuario = Usuario.query.get(session['user_id'])
-    # PATRÓN STRATEGY: Escalable para nuevos formatos
+    
+    # 1. Seleccionamos la estrategia
     if formato == 'pdf':
         estrategia = ReportePDF()
     else:
         estrategia = ReporteHTML()
         
+    # 2. Generamos el contenido (puede ser string HTML o bytes PDF)
     reporte_contenido = analitica.generar_reporte(usuario.departamento_id, estrategia)
+
+    # 3. Manejo diferenciado según el formato
+    if formato == 'pdf':
+        # Usamos send_file para enviar los bytes como un archivo descargable
+        return send_file(
+            io.BytesIO(reporte_contenido),
+            mimetype='application/pdf',
+            as_attachment=True, # Esto fuerza la descarga
+            download_name=f'Reporte_{usuario.departamento_id}.pdf'
+        )
+    
+    # Si es HTML, simplemente lo mostramos en el navegador
     return reporte_contenido
 
 # 7. INICIALIZACIÓN DATA-DRIVEN DESDE ARCHIVO
