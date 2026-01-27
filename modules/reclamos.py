@@ -20,14 +20,14 @@ class Reclamo(db.Model): # Clase Base para Reclamos, se transforma en tabla 'rec
     __tablename__ = 'reclamos'
     id = db.Column(db.Integer, primary_key=True)
     contenido = db.Column(db.Text, nullable=False)
-    estado = db.Column(db.String(20), default="pendiente")
+    _estado = db.Column('estado', db.String(50), default='pendiente')
     departamento_id = db.Column(db.String(50))
     adjunto_url = db.Column(db.String(200))
     fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
     # Usuarios que apoyan este reclamo
     seguidores = db.relationship('Usuario', secondary=adhesiones, backref='reclamos_apoyados')
-    tiempo_estimado = db.Column(db.Integer, nullable=True) # en días
+    _tiempo_estimado = db.Column('tiempo_estimado', db.Integer, nullable=True) # en días
     tiempo_resolucion = db.Column(db.Integer, nullable=True)
 
     def get_num_adherentes(self) -> int:
@@ -36,6 +36,29 @@ class Reclamo(db.Model): # Clase Base para Reclamos, se transforma en tabla 'rec
     # Representación para depuración
     def __repr__(self):
         return f"<Reclamo {self.id} - {self.estado.value}>"
+    
+    @property
+    def tiempo_estimado(self):
+        return self._tiempo_estimado
+
+    @tiempo_estimado.setter
+    def tiempo_estimado(self, valor):
+        if valor is not None:
+            if not (1 <= valor <= 15):
+                raise ValueError("El tiempo estimado debe estar entre 1 y 15 días.")
+        self._tiempo_estimado = valor
+
+    @property
+    def estado(self):
+        return self._estado
+
+    @estado.setter
+    def estado(self, nuevo_valor):
+        validos = ['pendiente', 'en_proceso', 'resuelto', 'invalido']
+        if nuevo_valor.lower() in validos:
+            self._estado = nuevo_valor.lower()
+        else:
+            raise ValueError(f"El estado {nuevo_valor} no es permitido.")
 
 class Clasificador:
     def __init__(self, stopwords = None):
